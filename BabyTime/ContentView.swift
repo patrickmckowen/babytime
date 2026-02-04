@@ -8,14 +8,52 @@
 import SwiftUI
 
 struct ContentView: View {
+    @State private var selectedTab = 0
+
     var body: some View {
-        VStack {
-            Image(systemName: "globe")
-                .imageScale(.large)
-                .foregroundStyle(.tint)
-            Text("Hello, world!")
+        TabView(selection: $selectedTab) {
+            Tab(value: 0) {
+                HomeView(scenario: .preview)
+            } label: {
+                Image(systemName: "house.fill")
+            }
+
+            Tab(value: 1) {
+                LogPlaceholderView()
+            } label: {
+                Image(systemName: "list.bullet")
+            }
+
+            Tab(value: 2) {
+                AddPlaceholderView()
+            } label: {
+                Image(systemName: "plus")
+            }
         }
-        .padding()
+    }
+}
+
+// MARK: - Placeholder Views
+
+private struct LogPlaceholderView: View {
+    var body: some View {
+        ZStack {
+            BTColors.surfacePage.ignoresSafeArea()
+            Text("Log")
+                .font(BTTypography.label)
+                .foregroundStyle(BTColors.textSecondary)
+        }
+    }
+}
+
+private struct AddPlaceholderView: View {
+    var body: some View {
+        ZStack {
+            BTColors.surfacePage.ignoresSafeArea()
+            Text("Add")
+                .font(BTTypography.label)
+                .foregroundStyle(BTColors.textSecondary)
+        }
     }
 }
 

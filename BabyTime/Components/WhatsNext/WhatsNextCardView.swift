@@ -2,44 +2,65 @@
 //  WhatsNextCardView.swift
 //  BabyTime
 //
-//  Variation B: Floating card with subtle shadow and border.
+//  Status-based card with contextual action buttons.
+//  Shows current situation; button presence signals readiness.
 //
 
 import SwiftUI
 
 struct WhatsNextCardView: View {
-    let label: String
-    let timeRemaining: String
-    let context: String
-    let actionLabel: String
-    let onAction: () -> Void
+    // Status display
+    let awakeTime: String
+    let lastSleepTime: String
+    let lastSleepDuration: String
+    let lastFeedTime: String
+    let lastFeedAmount: String
+
+    // Contextual actions
+    let showSleepAction: Bool
+    let showFeedAction: Bool
+    let onStartNap: () -> Void
+    let onLogFeed: () -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            Text(label)
-                .font(BTTypography.label)
-                .foregroundStyle(BTColors.textSecondary)
+            // Primary: Awake timer
+            HStack(alignment: .firstTextBaseline, spacing: BTSpacing.xxs) {
+                Text("Awake")
+                    .font(BTTypography.label)
+                    .foregroundStyle(BTColors.textSecondary)
+                Text(awakeTime)
+                    .font(BTTypography.displayLarge)
+                    .foregroundStyle(BTColors.textPrimary)
+            }
 
-            Text(timeRemaining)
-                .font(BTTypography.displayLarge)
-                .foregroundStyle(BTColors.textPrimary)
-                .padding(.top, BTSpacing.xxxs)
-
-            Text(context)
-                .font(BTTypography.caption)
-                .foregroundStyle(BTColors.textTertiary)
-                .padding(.top, BTSpacing.xxs)
-
-            Button(action: onAction) {
-                Text(actionLabel)
-                    .font(BTTypography.button)
-                    .foregroundStyle(BTColors.actionPrimary)
-                    .padding(.horizontal, BTSpacing.md)
-                    .padding(.vertical, BTSpacing.xs)
-                    .background(BTColors.actionPrimarySubtle)
-                    .clipShape(Capsule())
+            // Secondary: Last sleep and feed info
+            VStack(alignment: .leading, spacing: BTSpacing.xs) {
+                StatusRow(
+                    label: "Last slept",
+                    time: lastSleepTime,
+                    detail: lastSleepDuration
+                )
+                StatusRow(
+                    label: "Last fed",
+                    time: lastFeedTime,
+                    detail: lastFeedAmount
+                )
             }
             .padding(.top, BTSpacing.md)
+
+            // Contextual action buttons
+            if showSleepAction || showFeedAction {
+                HStack(spacing: BTSpacing.sm) {
+                    if showSleepAction {
+                        ActionButton(label: "Start Nap", action: onStartNap)
+                    }
+                    if showFeedAction {
+                        ActionButton(label: "Log Feed", action: onLogFeed)
+                    }
+                }
+                .padding(.top, BTSpacing.lg)
+            }
         }
         .padding(BTSpacing.lg)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -56,63 +77,177 @@ struct WhatsNextCardView: View {
                 .stroke(BTColors.cardBorder, lineWidth: 0.5)
         )
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("\(label), \(spokenTime(timeRemaining)). \(context)")
-        .accessibilityHint("Double tap to \(actionLabel.lowercased())")
+        .accessibilityLabel(accessibilityDescription)
     }
 
-    /// Converts compact time format to spoken format for VoiceOver
+    private var accessibilityDescription: String {
+        var description = "Awake for \(spokenTime(awakeTime)). "
+        description += "Last slept at \(lastSleepTime) for \(spokenTime(lastSleepDuration)). "
+        description += "Last fed at \(lastFeedTime), \(lastFeedAmount)."
+
+        if showSleepAction && showFeedAction {
+            description += " Ready for nap or feed."
+        } else if showSleepAction {
+            description += " Ready for nap."
+        } else if showFeedAction {
+            description += " Ready for feed."
+        }
+
+        return description
+    }
+
     private func spokenTime(_ time: String) -> String {
         time
+            .replacingOccurrences(of: "h ", with: " hour ")
             .replacingOccurrences(of: "h", with: " hour")
             .replacingOccurrences(of: "m", with: " minutes")
     }
 }
 
-// MARK: - Preview
+// MARK: - Subcomponents
 
-#Preview("Floating Card") {
-    ZStack {
-        BTColors.surfacePage
-            .ignoresSafeArea()
+private struct StatusRow: View {
+    let label: String
+    let time: String
+    let detail: String
 
-        VStack {
-            Spacer()
-                .frame(height: 120)
-
-            WhatsNextCardView(
-                label: "Next nap",
-                timeRemaining: "1h 23m",
-                context: "Wake window",
-                actionLabel: "Start Nap",
-                onAction: {}
-            )
-            .padding(.horizontal, BTSpacing.md)
-
-            Spacer()
+    var body: some View {
+        HStack(spacing: BTSpacing.xxs) {
+            Text(label)
+                .font(BTTypography.caption)
+                .foregroundStyle(BTColors.textTertiary)
+            Text(time)
+                .font(BTTypography.caption)
+                .foregroundStyle(BTColors.textSecondary)
+            Text("·")
+                .font(BTTypography.caption)
+                .foregroundStyle(BTColors.textTertiary)
+            Text(detail)
+                .font(BTTypography.caption)
+                .foregroundStyle(BTColors.textSecondary)
         }
     }
 }
 
-#Preview("Floating Card - Dark") {
-    ZStack {
-        BTColors.surfacePage
-            .ignoresSafeArea()
+private struct ActionButton: View {
+    let label: String
+    let action: () -> Void
 
-        VStack {
-            Spacer()
-                .frame(height: 120)
-
-            WhatsNextCardView(
-                label: "Next nap",
-                timeRemaining: "1h 23m",
-                context: "Wake window",
-                actionLabel: "Start Nap",
-                onAction: {}
-            )
-            .padding(.horizontal, BTSpacing.md)
-
-            Spacer()
+    var body: some View {
+        Button(action: action) {
+            Text(label)
+                .font(BTTypography.button)
+                .foregroundStyle(BTColors.actionPrimary)
+                .padding(.horizontal, BTSpacing.md)
+                .padding(.vertical, BTSpacing.xs)
+                .background(BTColors.actionPrimarySubtle)
+                .clipShape(Capsule())
         }
     }
+}
+
+// MARK: - Previews: Kaia on February 6, 2026
+
+#Preview("7:15 AM - Early morning, no actions") {
+    PreviewWrapper {
+        WhatsNextCardView(
+            awakeTime: "30m",
+            lastSleepTime: "6:45 AM",
+            lastSleepDuration: "8h",
+            lastFeedTime: "6:50 AM",
+            lastFeedAmount: "4oz",
+            showSleepAction: false,
+            showFeedAction: false,
+            onStartNap: {},
+            onLogFeed: {}
+        )
+    }
+}
+
+#Preview("8:20 AM - Nap ready") {
+    PreviewWrapper {
+        WhatsNextCardView(
+            awakeTime: "1h 25m",
+            lastSleepTime: "6:45 AM",
+            lastSleepDuration: "8h",
+            lastFeedTime: "7:15 AM",
+            lastFeedAmount: "4oz",
+            showSleepAction: true,
+            showFeedAction: false,
+            onStartNap: {},
+            onLogFeed: {}
+        )
+    }
+}
+
+#Preview("10:45 AM - Feed ready") {
+    PreviewWrapper {
+        WhatsNextCardView(
+            awakeTime: "45m",
+            lastSleepTime: "10:00 AM",
+            lastSleepDuration: "35m",
+            lastFeedTime: "7:15 AM",
+            lastFeedAmount: "4oz",
+            showSleepAction: false,
+            showFeedAction: true,
+            onStartNap: {},
+            onLogFeed: {}
+        )
+    }
+}
+
+#Preview("2:30 PM - Both ready") {
+    PreviewWrapper {
+        WhatsNextCardView(
+            awakeTime: "1h 30m",
+            lastSleepTime: "1:00 PM",
+            lastSleepDuration: "40m",
+            lastFeedTime: "11:30 AM",
+            lastFeedAmount: "5oz",
+            showSleepAction: true,
+            showFeedAction: true,
+            onStartNap: {},
+            onLogFeed: {}
+        )
+    }
+}
+
+#Preview("Dark Mode - Both ready") {
+    PreviewWrapper {
+        WhatsNextCardView(
+            awakeTime: "1h 30m",
+            lastSleepTime: "1:00 PM",
+            lastSleepDuration: "40m",
+            lastFeedTime: "11:30 AM",
+            lastFeedAmount: "5oz",
+            showSleepAction: true,
+            showFeedAction: true,
+            onStartNap: {},
+            onLogFeed: {}
+        )
+    }
     .preferredColorScheme(.dark)
+}
+
+// MARK: - Preview Helper
+
+private struct PreviewWrapper<Content: View>: View {
+    @ViewBuilder let content: () -> Content
+
+    var body: some View {
+        ZStack {
+            BTColors.surfacePage
+                .ignoresSafeArea()
+
+            VStack {
+                Spacer()
+                    .frame(height: 120)
+
+                content()
+                    .padding(.horizontal, BTSpacing.md)
+
+                Spacer()
+            }
+        }
+    }
 }

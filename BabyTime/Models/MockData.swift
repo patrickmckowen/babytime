@@ -146,6 +146,37 @@ extension Scenario {
         guard let mins = minutesSinceLastWake else { return false }
         return mins > targets.wakeWindowMinutes.upperBound
     }
+
+    // MARK: - Status Card Helpers
+
+    var lastSleepTimeFormatted: String {
+        lastSleep?.endTime.shortTime ?? "--"
+    }
+
+    var lastSleepDurationFormatted: String {
+        lastSleep?.durationDescription ?? "--"
+    }
+
+    var lastFeedTimeFormatted: String {
+        lastFeed?.startTime.shortTime ?? "--"
+    }
+
+    var lastFeedAmountFormatted: String {
+        guard let feed = lastFeed else { return "--" }
+        return feed.type.shortDescription
+    }
+
+    /// True when awake time has entered the target wake window range
+    var isSleepReady: Bool {
+        guard let mins = minutesSinceLastWake else { return false }
+        return mins >= targets.wakeWindowMinutes.lowerBound
+    }
+
+    /// True when time since last feed has entered the target feed interval range
+    var isFeedReady: Bool {
+        guard let mins = minutesSinceLastFeed else { return false }
+        return mins >= targets.feedIntervalMinutes.lowerBound
+    }
 }
 
 // MARK: - Time Formatting

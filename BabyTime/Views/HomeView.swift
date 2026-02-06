@@ -20,11 +20,15 @@ struct HomeView: View {
 
                 // What's Next Card
                 WhatsNextCardView(
-                    label: whatsNextLabel,
-                    timeRemaining: scenario.wakeWindowFormatted,
-                    context: whatsNextContext,
-                    actionLabel: whatsNextAction,
-                    onAction: { }
+                    awakeTime: scenario.wakeWindowFormatted,
+                    lastSleepTime: scenario.lastSleepTimeFormatted,
+                    lastSleepDuration: scenario.lastSleepDurationFormatted,
+                    lastFeedTime: scenario.lastFeedTimeFormatted,
+                    lastFeedAmount: scenario.lastFeedAmountFormatted,
+                    showSleepAction: scenario.isSleepReady,
+                    showFeedAction: scenario.isFeedReady,
+                    onStartNap: { },
+                    onLogFeed: { }
                 )
                 .padding(.horizontal, BTSpacing.md)
                 .padding(.top, BTSpacing.xl)
@@ -40,19 +44,6 @@ struct HomeView: View {
         .background(BTColors.surfacePage)
     }
 
-    // MARK: - What's Next State
-
-    private var whatsNextLabel: String {
-        scenario.isWakeWindowExceeded ? "Overdue" : "Next nap"
-    }
-
-    private var whatsNextContext: String {
-        "Wake window"
-    }
-
-    private var whatsNextAction: String {
-        "Start Nap"
-    }
 }
 
 // MARK: - Home Header

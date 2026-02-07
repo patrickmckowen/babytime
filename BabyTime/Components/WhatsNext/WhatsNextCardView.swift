@@ -23,31 +23,29 @@ struct WhatsNextCardView: View {
     let onLogFeed: () -> Void
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            // Primary: Awake timer
-            HStack(alignment: .firstTextBaseline, spacing: BTSpacing.xxs) {
+        VStack(alignment: .leading, spacing: BTSpacing.lg) {
+            // Hero headline: "Awake 2h 0m" as one flowing unit
+            HStack(alignment: .firstTextBaseline, spacing: BTSpacing.xs) {
                 Text("Awake")
-                    .font(BTTypography.label)
-                    .foregroundStyle(BTColors.textSecondary)
+                    .foregroundStyle(BTColors.textTertiary)
                 Text(awakeTime)
-                    .font(BTTypography.displayLarge)
                     .foregroundStyle(BTColors.textPrimary)
             }
+            .font(.system(size: 48, weight: .semibold, design: .rounded))
 
-            // Secondary: Last sleep and feed info
-            VStack(alignment: .leading, spacing: BTSpacing.xs) {
+            // Status rows with SF Symbols
+            VStack(alignment: .leading, spacing: BTSpacing.sm) {
                 StatusRow(
-                    label: "Last slept",
+                    symbol: "zzz",
                     time: lastSleepTime,
                     detail: lastSleepDuration
                 )
                 StatusRow(
-                    label: "Last fed",
+                    symbol: "drop.fill",
                     time: lastFeedTime,
                     detail: lastFeedAmount
                 )
             }
-            .padding(.top, BTSpacing.md)
 
             // Contextual action buttons
             if showSleepAction || showFeedAction {
@@ -59,7 +57,6 @@ struct WhatsNextCardView: View {
                         ActionButton(label: "Log Feed", action: onLogFeed)
                     }
                 }
-                .padding(.top, BTSpacing.lg)
             }
         }
         .padding(BTSpacing.lg)
@@ -107,25 +104,27 @@ struct WhatsNextCardView: View {
 // MARK: - Subcomponents
 
 private struct StatusRow: View {
-    let label: String
+    let symbol: String
     let time: String
     let detail: String
 
     var body: some View {
-        HStack(spacing: BTSpacing.xxs) {
-            Text(label)
-                .font(BTTypography.caption)
+        HStack(spacing: BTSpacing.sm) {
+            Image(systemName: symbol)
+                .font(.system(size: 20, weight: .medium))
                 .foregroundStyle(BTColors.textTertiary)
+                .frame(width: 24)
+
             Text(time)
-                .font(BTTypography.caption)
                 .foregroundStyle(BTColors.textSecondary)
+
             Text("·")
-                .font(BTTypography.caption)
                 .foregroundStyle(BTColors.textTertiary)
+
             Text(detail)
-                .font(BTTypography.caption)
                 .foregroundStyle(BTColors.textSecondary)
         }
+        .font(.system(size: 20, weight: .medium, design: .rounded))
     }
 }
 
@@ -136,10 +135,10 @@ private struct ActionButton: View {
     var body: some View {
         Button(action: action) {
             Text(label)
-                .font(BTTypography.button)
+                .font(.system(size: 17, weight: .semibold, design: .rounded))
                 .foregroundStyle(BTColors.actionPrimary)
                 .padding(.horizontal, BTSpacing.md)
-                .padding(.vertical, BTSpacing.xs)
+                .padding(.vertical, BTSpacing.sm)
                 .background(BTColors.actionPrimarySubtle)
                 .clipShape(Capsule())
         }

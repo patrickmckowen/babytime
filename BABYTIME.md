@@ -44,7 +44,7 @@ Design for 3am, one arm holding a baby, brain at 40%.
 
 ## Key Scenarios
 
-1. **The glance** — Parent wakes, checks phone, sees current status at a glance. If action buttons are visible, baby is in the window for that activity. No interpretation needed—button presence is the signal.
+1. **The glance** — Parent checks phone in the middle of a busy day, sees current status at a glance. 
 2. **The forgotten timer** — Feeding started 10 minutes ago, parent remembers, starts timer and adjusts start time back
 3. **The handoff** — Partner takes over, opens app, has full context without a conversation
 4. **The check-in** — Quick look at daily progress toward feed/sleep goals

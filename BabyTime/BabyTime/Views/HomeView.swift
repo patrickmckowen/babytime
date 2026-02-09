@@ -18,21 +18,30 @@ struct HomeView: View {
                     .padding(.horizontal, BTSpacing.md)
                     .padding(.top, BTSpacing.md)
 
-                // What's Next Card
-                WhatsNextCardView(
-                    label: whatsNextLabel,
-                    timeRemaining: scenario.wakeWindowFormatted,
-                    context: whatsNextContext,
-                    actionLabel: whatsNextAction,
-                    onAction: { }
+                // Eating Card
+                EatingCardView(
+                    timeSinceLastFeed: scenario.timeSinceLastFeedFormatted,
+                    feedCount: scenario.feedCount,
+                    totalOz: scenario.totalIntakeOz,
+                    dailyGoal: scenario.baby.ageBracket.dailyIntakeOz,
+                    hasEstimates: scenario.hasNursingEstimates,
+                    onAddFeed: { }
                 )
                 .padding(.horizontal, BTSpacing.md)
                 .padding(.top, BTSpacing.xl)
 
-                // Timeline
-                TimelineView(activities: scenario.today.allActivities)
-                    .padding(.horizontal, BTSpacing.md)
-                    .padding(.top, BTSpacing.xxl)
+                // Sleeping Card
+                SleepingCardView(
+                    awakeTime: scenario.awakeTimeFormatted,
+                    sleepingTime: nil, // TODO: Add support for active sleep timer
+                    napCount: scenario.napCount,
+                    totalSleepFormatted: scenario.totalSleepFormatted,
+                    dailyGoal: scenario.baby.ageBracket.dailySleepHours,
+                    totalSleepMinutes: scenario.totalSleepMinutes,
+                    onStartNap: { }
+                )
+                .padding(.horizontal, BTSpacing.md)
+                .padding(.top, BTSpacing.md)
 
                 Spacer(minLength: BTSpacing.xxl)
             }
@@ -40,19 +49,6 @@ struct HomeView: View {
         .background(BTColors.surfacePage)
     }
 
-    // MARK: - What's Next State
-
-    private var whatsNextLabel: String {
-        scenario.isWakeWindowExceeded ? "Overdue" : "Next nap"
-    }
-
-    private var whatsNextContext: String {
-        "Wake window"
-    }
-
-    private var whatsNextAction: String {
-        "Start Nap"
-    }
 }
 
 // MARK: - Home Header

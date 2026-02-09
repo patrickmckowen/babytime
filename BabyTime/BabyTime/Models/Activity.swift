@@ -24,6 +24,10 @@ struct Baby: Identifiable {
         }
         return "\(days) day\(days == 1 ? "" : "s")"
     }
+
+    var ageBracket: AgeBracket {
+        AgeBracket(ageInDays: ageInDays)
+    }
 }
 
 // MARK: - Feed Types
@@ -58,6 +62,32 @@ enum FeedType {
             return "\(Int(oz)) oz"
         case .nursing(_, let mins):
             return "\(mins) min"
+        }
+    }
+
+    /// Returns actual oz for bottles, nil for nursing (use estimatedOz for nursing)
+    var actualOz: Double? {
+        switch self {
+        case .bottle(_, let oz): return oz
+        case .nursing: return nil
+        }
+    }
+
+    /// Estimated oz for nursing based on age bracket
+    func estimatedOz(for bracket: AgeBracket) -> Double {
+        switch self {
+        case .bottle(_, let oz):
+            return oz
+        case .nursing(_, let mins):
+            return Double(mins) * bracket.nursingOzPerMinute
+        }
+    }
+
+    /// Whether this is an estimate (nursing) vs actual measurement (bottle)
+    var isEstimate: Bool {
+        switch self {
+        case .bottle: return false
+        case .nursing: return true
         }
     }
 }
@@ -127,6 +157,59 @@ enum Activity: Identifiable {
         switch self {
         case .feed(let f): return f.type.shortDescription
         case .sleep(let s): return s.durationDescription
+        }
+    }
+}
+
+// MARK: - Age Bracket
+
+enum AgeBracket: String, CaseIterable {
+    case newborn   // 0-1 month
+    case infant1   // 1-2 months
+    case infant2   // 2-4 months
+    case infant3   // 4-6 months
+    case infant4   // 6-9 months
+    case infant5   // 9-12 months
+
+    init(ageInDays: Int) {
+        switch ageInDays {
+        case 0..<30:      self = .newborn
+        case 30..<60:     self = .infant1
+        case 60..<120:    self = .infant2
+        case 120..<180:   self = .infant3
+        case 180..<270:   self = .infant4
+        default:          self = .infant5
+        }
+    }
+
+    var dailyIntakeOz: ClosedRange<Int> {
+        switch self {
+        case .newborn: return 14...24
+        case .infant1: return 18...28
+        case .infant2: return 24...32
+        case .infant3: return 24...36
+        case .infant4: return 24...32
+        case .infant5: return 20...28
+        }
+    }
+
+    var dailySleepHours: ClosedRange<Int> {
+        switch self {
+        case .newborn: return 14...17
+        case .infant1: return 14...17
+        case .infant2: return 14...16
+        case .infant3: return 12...16
+        case .infant4: return 12...15
+        case .infant5: return 12...14
+        }
+    }
+
+    /// Estimated oz per minute for nursing
+    var nursingOzPerMinute: Double {
+        switch self {
+        case .newborn: return 0.1
+        case .infant1: return 0.15
+        default:       return 0.2
         }
     }
 }

@@ -19,7 +19,7 @@ struct ContentView: View {
             }
 
             Tab(value: 1) {
-                LogPlaceholderView()
+                LogView(scenario: .preview)
             } label: {
                 Image(systemName: "list.bullet")
             }
@@ -34,17 +34,6 @@ struct ContentView: View {
 }
 
 // MARK: - Placeholder Views
-
-private struct LogPlaceholderView: View {
-    var body: some View {
-        ZStack {
-            BTColors.surfacePage.ignoresSafeArea()
-            Text("Log")
-                .font(BTTypography.label)
-                .foregroundStyle(BTColors.textSecondary)
-        }
-    }
-}
 
 private struct AddPlaceholderView: View {
     var body: some View {

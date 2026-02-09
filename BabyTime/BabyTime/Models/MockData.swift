@@ -146,6 +146,108 @@ extension Scenario {
         guard let mins = minutesSinceLastWake else { return false }
         return mins > targets.wakeWindowMinutes.upperBound
     }
+
+    // MARK: - Status Card Helpers
+
+    var lastSleepTimeFormatted: String {
+        lastSleep?.endTime.shortTime ?? "--"
+    }
+
+    var lastSleepDurationFormatted: String {
+        lastSleep?.durationDescription ?? "--"
+    }
+
+    var lastFeedTimeFormatted: String {
+        lastFeed?.startTime.shortTime ?? "--"
+    }
+
+    var lastFeedAmountFormatted: String {
+        guard let feed = lastFeed else { return "--" }
+        return feed.type.shortDescription
+    }
+
+    /// True when awake time has entered the target wake window range
+    var isSleepReady: Bool {
+        guard let mins = minutesSinceLastWake else { return false }
+        return mins >= targets.wakeWindowMinutes.lowerBound
+    }
+
+    /// True when time since last feed has entered the target feed interval range
+    var isFeedReady: Bool {
+        guard let mins = minutesSinceLastFeed else { return false }
+        return mins >= targets.feedIntervalMinutes.lowerBound
+    }
+
+    // MARK: - Eating Card Helpers
+
+    /// Number of feeds today
+    var feedCount: Int {
+        today.feeds.count
+    }
+
+    /// Total intake including nursing estimates
+    var totalIntakeOz: Double {
+        today.feeds.reduce(0) { total, feed in
+            total + feed.type.estimatedOz(for: baby.ageBracket)
+        }
+    }
+
+    /// Whether any feeds are nursing (estimates)
+    var hasNursingEstimates: Bool {
+        today.feeds.contains { $0.type.isEstimate }
+    }
+
+    /// Progress toward daily intake goal (0.0-1.0, can exceed 1.0)
+    var intakeProgress: Double {
+        let midpoint = Double(baby.ageBracket.dailyIntakeOz.lowerBound + baby.ageBracket.dailyIntakeOz.upperBound) / 2
+        return totalIntakeOz / midpoint
+    }
+
+    /// Formatted time since last feed (e.g. "1h 30m ago")
+    var timeSinceLastFeedFormatted: String {
+        guard let mins = minutesSinceLastFeed else { return "No feeds" }
+        let hours = mins / 60
+        let minutes = mins % 60
+        if hours > 0 {
+            return "\(hours)h \(minutes)m ago"
+        }
+        return "\(minutes)m ago"
+    }
+
+    // MARK: - Sleeping Card Helpers
+
+    /// Number of sleep sessions today
+    var napCount: Int {
+        today.sleeps.count
+    }
+
+    /// Formatted total sleep (e.g. "3h 20m")
+    var totalSleepFormatted: String {
+        let hours = totalSleepMinutes / 60
+        let mins = totalSleepMinutes % 60
+        if hours > 0 {
+            return "\(hours)h \(mins)m"
+        }
+        return "\(mins)m"
+    }
+
+    /// Progress toward daily sleep goal (0.0-1.0, can exceed 1.0)
+    var sleepProgress: Double {
+        let midpoint = Double(baby.ageBracket.dailySleepHours.lowerBound + baby.ageBracket.dailySleepHours.upperBound) / 2
+        let hoursSlept = Double(totalSleepMinutes) / 60.0
+        return hoursSlept / midpoint
+    }
+
+    /// Formatted awake time (e.g. "2h 0m")
+    var awakeTimeFormatted: String {
+        guard let mins = minutesSinceLastWake else { return "Awake" }
+        let hours = mins / 60
+        let minutes = mins % 60
+        if hours > 0 {
+            return "\(hours)h \(minutes)m"
+        }
+        return "\(minutes)m"
+    }
 }
 
 // MARK: - Time Formatting

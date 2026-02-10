@@ -9,9 +9,12 @@ import SwiftUI
 
 @main
 struct BabyTimeApp: App {
+    @State private var activityManager = ActivityManager()
+
     var body: some Scene {
         WindowGroup {
             ContentView()
+                .environment(activityManager)
         }
     }
 }

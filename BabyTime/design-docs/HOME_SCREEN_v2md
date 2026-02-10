@@ -1,0 +1,141 @@
+# Home Screen — SwiftUI Build Brief
+
+## Overview
+
+Build the home screen for BabyTime as a scrollable view. The screen has four sections stacked vertically: a fullbleed baby photo with date/age overlay, a feed action card, a sleep status card, and a "Today" summary card.
+
+Mock data is already available via `Scenario.preview` in `MockData.swift`. Use the existing computed properties — do not duplicate logic.
+
+---
+
+## Design System
+
+### Color Tokens
+
+Define these as semantic Color extensions. All colors have warm brown undertones — there are no pure blacks, grays, or whites in this palette.
+
+| Token | Hex | Usage |
+|---|---|---|
+| `background` | #F5F1EB | Page background, card background (cards match the background) |
+| `textPrimary` | #2C2520 | Headlines, stat values, primary content |
+| `textSecondary` | #9B8E82 | Labels, subheads, supporting text |
+| `textMuted` | #BDB1A5 | Stat column labels in the Today card |
+| `sleepAccent` | #7BA7C2 | Sleep icon and icon container tint only |
+| `feedAccent` | #C8916B | Feed icon and icon container tint only |
+| `divider` | #2C2520 at 6% opacity | Hairline between rows in Today card |
+| `photoPlaceholder` | #E8E0D6 | Empty state for baby photo |
+
+### Typography
+
+Use SF Pro (system font). All text uses negative tracking (tight letter-spacing).
+
+| Style | Size | Weight | Tracking | Color | Usage |
+|---|---|---|---|---|---|
+| Headline | 44pt | Bold (.bold) | -2.2pt | textPrimary | Card primary values ("3:30 PM", "1h 25m") |
+| Label | 17pt | Medium (.medium) | -0.2pt | textSecondary | Card top line ("Offer 5 oz by"), card bottom line ("Last fed..."), "Today" header, photo overlay text |
+| Photo Date | 17pt | Semibold (.semibold) | -0.3pt | textPrimary | Date line on photo |
+| Photo Age | 17pt | Semibold (.semibold) | -0.3pt | textSecondary | Age line on photo |
+| Stat Value | 17pt | Semibold (.semibold) | -0.4pt | textPrimary | Values in Today card rows |
+| Stat Label | 13pt | Medium (.medium) | -0.1pt | textMuted | Labels above values in Today card rows |
+
+### Card Style
+
+Cards use the same background color as the page. They float via a multi-layered shadow. No border, no stroke.
+
+```
+Corner radius: 22pt
+Padding: 26pt top, 24pt horizontal, 24pt bottom
+
+Shadow (4 layers, all using rgba(44, 37, 32, ...)):
+  - offset: (0, 1), blur: 2, opacity: 0.04
+  - offset: (0, 4), blur: 8, opacity: 0.03
+  - offset: (0, 12), blur: 24, opacity: 0.05
+  - offset: (0, 24), blur: 48, opacity: 0.04
+```
+
+### Spacing
+
+| Between | Value |
+|---|---|
+| Photo bottom to first card | 20pt |
+| Card to card | 14pt |
+| Card label to headline | 6pt |
+| Card headline to detail line | 12pt |
+| Today header to first row | 22pt |
+| Row to divider to row | 18pt padding above and below divider |
+| Horizontal page margins | 24pt |
+
+### Icons
+
+Use SF Symbols for the Today card row anchors:
+
+| Row | Symbol | Color | Container |
+|---|---|---|---|
+| Sleep | `moon.fill` | sleepAccent | 36×36pt, cornerRadius 10, background sleepAccent at 10% opacity |
+| Feed | `drop.fill` | feedAccent | 36×36pt, cornerRadius 10, background feedAccent at 10% opacity |
+
+---
+
+## Screen Layout (top to bottom)
+
+### 1. Baby Photo
+
+- **Fullbleed** — edge to edge horizontally, flush to top of screen (extends under status bar)
+- Aspect ratio: 4:3
+- The photo is the baby's profile image. Show a placeholder state with the background color `photoPlaceholder` and centered text "Add photo" in textSecondary if no image is set.
+- **Date + age overlay** — positioned bottom-left, inset with 24pt horizontal padding and 20pt bottom padding
+  - Line 1: Formatted date ("Monday, February 9") in Photo Date style
+  - Line 2: Age string ("3 months old") in Photo Age style
+  - These sit directly on the photo — when a real image is present, consider a subtle gradient scrim at the bottom for legibility. For now with the placeholder, no scrim needed.
+
+### 2. Feed Card
+
+Content (3 lines):
+- **Label:** "Offer [amount] oz by" — Label style
+- **Headline:** Next feed time formatted as clock time ("3:30 PM") — Headline style
+- **Detail:** "Last fed [amount] oz [time ago] ago" — Label style
+
+The `[amount]` for "Offer" is calculated from: remaining daily oz ÷ remaining feeds in the day window. Use the existing `Scenario` computed properties for last feed info. The "Feed by" time is calculated from: last feed time + feed interval from age targets. This calculation logic may need to be added to the Scenario extensions.
+
+### 3. Sleep Card
+
+Content (3 lines):
+- **Label:** "Awake for" — Label style
+- **Headline:** Formatted wake duration ("2h 00m") — Headline style
+- **Detail:** "Last slept [duration] at [time]" — Label style
+
+Use existing `wakeWindowFormatted`, `lastSleepDurationFormatted`, and `lastSleepTimeFormatted` computed properties.
+
+### 4. Today Summary Card
+
+Content:
+- **Header:** "Today" — Label style but using textPrimary color and semibold weight (same as Photo Date style)
+- **Sleep row:** Icon container (moon) + 3 stat columns: Total Sleep, Longest, Naps
+- **Hairline divider**
+- **Feed row:** Icon container (drop) + 3 stat columns: Total, Feeds, Avg
+
+Each stat column has:
+- Label on top (Stat Label style)
+- Value below (Stat Value style)
+
+The three stat columns share equal flex space to the right of the icon container. Gap between icon container and first column: 14pt.
+
+Use existing computed properties: `totalSleepFormatted`, `longestSleepMinutes` (format as "Xm" or "Xh Ym"), `napCount`, `totalOz` (format as "X oz"), `feedCount`. Average oz = totalOz / feedCount, formatted to one decimal ("4.3 oz").
+
+---
+
+## State: Awake, Not Feeding
+
+This brief covers the primary daytime state where the baby is awake and not currently feeding. Future states (sleeping, actively feeding) will be separate briefs.
+
+---
+
+## Implementation Notes
+
+- The entire screen scrolls vertically.
+- Use `ignoresSafeArea(.top)` for the photo to extend under the status bar.
+- Define color tokens as a `Color` extension so they can be swapped for dark mode and theming later.
+- Define the multi-layer shadow as a `ViewModifier` for reuse across all cards.
+- The view should read data from a `Scenario` object. For preview, use `Scenario.preview`.
+- Keep view code clean — extract each card as its own subview (e.g., `FeedCard`, `SleepCard`, `TodaySummaryCard`).
+- Do not add navigation, tab bars, floating action buttons, or settings at this stage. Just the scrollable home content.

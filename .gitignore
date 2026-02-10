@@ -20,8 +20,11 @@ build/
 Packages/
 Package.resolved
 
-# VS Code
+# VS Code / Cursor
 .vscode/
+
+# SourceKit-LSP
+buildServer.json
 
 # Secrets
 *.env

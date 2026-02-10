@@ -8,45 +8,41 @@
 import SwiftUI
 
 struct ContentView: View {
-    @State private var selectedTab = 0
+    @Environment(ActivityManager.self) private var activityManager
+    @State private var showNursingSheet = false
 
     var body: some View {
-        TabView(selection: $selectedTab) {
-            Tab(value: 0) {
-                HomeView(scenario: .preview)
-            } label: {
-                Image(systemName: "house.fill")
-            }
+        NavigationStack {
+            HomeView(onNursingTap: { showNursingSheet = true })
+                .toolbar {
+                    ToolbarItemGroup(placement: .bottomBar) {
+                        Button {
+                            showNursingSheet = true
+                        } label: {
+                            Image(systemName: "drop.fill")
+                        }
 
-            Tab(value: 1) {
-                LogView(scenario: .preview)
-            } label: {
-                Image(systemName: "list.bullet")
-            }
+                        Button {
+                            // Bottle — placeholder
+                        } label: {
+                            Image(systemName: "waterbottle.fill")
+                        }
 
-            Tab(value: 2) {
-                AddPlaceholderView()
-            } label: {
-                Image(systemName: "plus")
-            }
+                        Button {
+                            // Nap — placeholder
+                        } label: {
+                            Image(systemName: "moon.zzz.fill")
+                        }
+                    }
+                }
         }
-    }
-}
-
-// MARK: - Placeholder Views
-
-private struct AddPlaceholderView: View {
-    var body: some View {
-        ZStack {
-            Color.btBackground.ignoresSafeArea()
-            Text("Add")
-                .font(BTTypography.label)
-                .tracking(BTTracking.label)
-                .foregroundStyle(Color.btTextSecondary)
+        .sheet(isPresented: $showNursingSheet) {
+            NursingSheetView()
         }
     }
 }
 
 #Preview {
     ContentView()
+        .environment(ActivityManager())
 }

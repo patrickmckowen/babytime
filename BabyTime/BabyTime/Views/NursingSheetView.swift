@@ -14,26 +14,27 @@ struct NursingSheetView: View {
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
-                Spacer()
+                // Timer tap target — entire area from navbar to timesList
+                VStack {
+                    Spacer()
+                    timerDisplay
+                    Spacer()
+                }
+                .frame(maxWidth: .infinity)
+                .contentShape(Rectangle())
+                .onTapGesture {
+                    toggleTimer()
+                }
 
-                // Timer display
-                timerDisplay
-
-                Spacer()
-
-                // Play / Stop button
-                playStopButton
-                    .padding(.bottom, 40)
-
-                // Start / End time rows
+                // Start / End time rows (always visible)
                 timesList
 
                 // Reset / Save buttons
                 actionButtons
                     .padding(.top, 24)
-                    .padding(.bottom, 16)
             }
             .padding(.horizontal, BTSpacing.pageMargin)
+            .padding(.bottom, BTSpacing.pageMargin)
             .background(Color.btBackground)
             .navigationTitle("Nursing")
             .navigationBarTitleDisplayMode(.inline)
@@ -50,42 +51,45 @@ struct NursingSheetView: View {
         }
     }
 
+    // MARK: - Timer Actions
+
+    private func toggleTimer() {
+        if activityManager.isNursingActive {
+            activityManager.stopNursing()
+        } else {
+            // Start or restart
+            if activityManager.hasNursingSession && !activityManager.isNursingActive {
+                // Reset and start new session
+                activityManager.resetNursing()
+            }
+            activityManager.startNursing()
+        }
+    }
+
     // MARK: - Timer Display
 
     private var timerDisplay: some View {
-        SwiftUI.TimelineView(.periodic(from: .now, by: 1)) { context in
-            Text(activityManager.nursingTimerString(at: context.date))
-                .font(.system(size: 64, weight: .bold, design: .monospaced))
-                .tracking(-2)
-                .foregroundStyle(Color.btTextPrimary)
-        }
-    }
-
-    // MARK: - Play / Stop Button
-
-    private var playStopButton: some View {
-        Button {
-            if activityManager.isNursingActive {
-                activityManager.stopNursing()
-            } else if !activityManager.hasNursingSession {
-                activityManager.startNursing()
+        VStack(spacing: 8) {
+            SwiftUI.TimelineView(.periodic(from: .now, by: 1)) { context in
+                Text(activityManager.nursingTimerString(at: context.date))
+                    .font(.system(size: 64, weight: .regular, design: .default))
+                    .monospacedDigit()
+                    .tracking(-2)
+                    .foregroundStyle(Color.btTextPrimary)
             }
-        } label: {
-            Image(systemName: buttonIcon)
-                .font(.system(size: 32, weight: .semibold))
-                .foregroundStyle(.white)
-                .frame(width: 80, height: 80)
-                .background(Color.btFeedAccent)
-                .clipShape(Circle())
+
+            Text(timerHintText)
+                .font(.system(size: 13, weight: .regular))
+                .foregroundStyle(Color.btTextSecondary.opacity(0.6))
         }
-        .disabled(activityManager.hasNursingSession && !activityManager.isNursingActive)
     }
 
-    private var buttonIcon: String {
+    private var timerHintText: String {
         if activityManager.isNursingActive {
-            return "stop.fill"
+            return "Tap to stop"
+        } else {
+            return "Tap to start"
         }
-        return "play.fill"
     }
 
     // MARK: - Times List
@@ -95,59 +99,106 @@ struct NursingSheetView: View {
         @Bindable var manager = activityManager
 
         VStack(spacing: 0) {
-            // Start time row
-            if let startTime = activityManager.nursingStartTime {
-                HStack {
-                    Text("Start")
-                        .font(BTTypography.label)
-                        .tracking(BTTracking.label)
-                        .foregroundStyle(Color.btTextSecondary)
+            // Start time row - always visible
+            HStack {
+                Text("Start")
+                    .font(BTTypography.label)
+                    .tracking(BTTracking.label)
+                    .foregroundStyle(Color.btTextSecondary)
 
-                    Spacer()
+                Spacer()
 
+                HStack(spacing: 12) {
+                    // Date picker — native popup, custom "Today" label
+                    ZStack {
+                        DatePicker(
+                            "",
+                            selection: Binding(
+                                get: { manager.nursingStartTime ?? Date() },
+                                set: { manager.nursingStartTime = $0 }
+                            ),
+                            displayedComponents: [.date]
+                        )
+                        .labelsHidden()
+                        .colorMultiply(.clear)
+
+                        Text(startDateLabel)
+                            .font(.body)
+                            .foregroundStyle(Color(.label))
+                            .padding(.horizontal, 12)
+                            .frame(height: 32)
+                            .background(Color(.tertiarySystemFill))
+                            .clipShape(Capsule())
+                            .allowsHitTesting(false)
+                    }
+                    .fixedSize()
+
+                    // Time picker — fully native
                     DatePicker(
                         "",
                         selection: Binding(
                             get: { manager.nursingStartTime ?? Date() },
                             set: { manager.nursingStartTime = $0 }
                         ),
-                        displayedComponents: [.date, .hourAndMinute]
-                    )
-                    .labelsHidden()
-                }
-                .padding(.vertical, 14)
-
-                Divider()
-                    .foregroundStyle(Color.btDivider)
-            }
-
-            // End time row
-            if let endTime = activityManager.nursingEndTime {
-                HStack {
-                    Text("End")
-                        .font(BTTypography.label)
-                        .tracking(BTTracking.label)
-                        .foregroundStyle(Color.btTextSecondary)
-
-                    Spacer()
-
-                    DatePicker(
-                        "",
-                        selection: Binding(
-                            get: { manager.nursingEndTime ?? Date() },
-                            set: { manager.nursingEndTime = $0 }
-                        ),
                         displayedComponents: [.hourAndMinute]
                     )
                     .labelsHidden()
                 }
-                .padding(.vertical, 14)
             }
+            .padding(.vertical, 14)
+
+            Divider()
+                .foregroundStyle(Color.btDivider)
+
+            // End time row - always visible, disabled until stopped
+            HStack {
+                Text("End")
+                    .font(BTTypography.label)
+                    .tracking(BTTracking.label)
+                    .foregroundStyle(Color.btTextSecondary)
+
+                Spacer()
+
+                let hasEnd = manager.nursingEndTime != nil
+
+                DatePicker(
+                    "",
+                    selection: Binding(
+                        get: { manager.nursingEndTime ?? Date() },
+                        set: { manager.nursingEndTime = $0 }
+                    ),
+                    displayedComponents: [.hourAndMinute]
+                )
+                .labelsHidden()
+                .disabled(!hasEnd || activityManager.isNursingActive)
+                .opacity(hasEnd ? (activityManager.isNursingActive ? 0.5 : 1.0) : 0.0)
+                .overlay {
+                    if !hasEnd {
+                        Text("—")
+                            .font(.subheadline.weight(.medium))
+                            .foregroundStyle(Color.btTextSecondary.opacity(0.4))
+                            .frame(maxWidth: .infinity, alignment: .trailing)
+                    }
+                }
+            }
+            .padding(.vertical, 14)
         }
         .padding(.horizontal, BTSpacing.cardPaddingHorizontal)
         .background(Color.btBackground)
         .clipShape(RoundedRectangle(cornerRadius: BTRadius.card, style: .continuous))
         .cardShadow()
+        .padding(.vertical, 4)
+    }
+
+    // MARK: - Date Label
+
+    private var startDateLabel: String {
+        guard let date = activityManager.nursingStartTime else { return "Today" }
+        let calendar = Calendar.current
+        if calendar.isDateInToday(date) { return "Today" }
+        if calendar.isDateInYesterday(date) { return "Yesterday" }
+        if calendar.isDateInTomorrow(date) { return "Tomorrow" }
+        return date.formatted(.dateTime.month(.abbreviated).day())
     }
 
     // MARK: - Action Buttons
@@ -165,7 +216,7 @@ struct NursingSheetView: View {
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 16)
                     .background(Color.btBackground)
-                    .clipShape(RoundedRectangle(cornerRadius: BTRadius.card, style: .continuous))
+                    .clipShape(Capsule())
                     .cardShadow()
             }
             .disabled(!activityManager.hasNursingSession)
@@ -182,7 +233,7 @@ struct NursingSheetView: View {
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 16)
                     .background(Color.btFeedAccent)
-                    .clipShape(RoundedRectangle(cornerRadius: BTRadius.card, style: .continuous))
+                    .clipShape(Capsule())
                     .cardShadow()
             }
             .disabled(!activityManager.hasNursingSession)

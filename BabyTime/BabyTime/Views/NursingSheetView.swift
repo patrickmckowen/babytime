@@ -109,19 +109,11 @@ struct NursingSheetView: View {
                 Spacer()
 
                 HStack(spacing: 12) {
-                    // Date picker — native popup, custom "Today" label
-                    ZStack {
-                        DatePicker(
-                            "",
-                            selection: Binding(
-                                get: { manager.nursingStartTime ?? Date() },
-                                set: { manager.nursingStartTime = $0 }
-                            ),
-                            displayedComponents: [.date]
-                        )
-                        .labelsHidden()
-                        .colorMultiply(.clear)
-
+                    // Day select menu — Today / Yesterday
+                    Menu {
+                        Button("Today") { updateStartDay(to: "Today") }
+                        Button("Yesterday") { updateStartDay(to: "Yesterday") }
+                    } label: {
                         Text(startDateLabel)
                             .font(.body)
                             .foregroundStyle(Color(.label))
@@ -129,9 +121,7 @@ struct NursingSheetView: View {
                             .frame(height: 32)
                             .background(Color(.tertiarySystemFill))
                             .clipShape(Capsule())
-                            .allowsHitTesting(false)
                     }
-                    .fixedSize()
 
                     // Time picker — fully native
                     DatePicker(
@@ -194,11 +184,28 @@ struct NursingSheetView: View {
 
     private var startDateLabel: String {
         guard let date = activityManager.nursingStartTime else { return "Today" }
+        if Calendar.current.isDateInYesterday(date) { return "Yesterday" }
+        return "Today"
+    }
+
+    // MARK: - Day Selection
+
+    private func updateStartDay(to day: String) {
+        guard let current = activityManager.nursingStartTime else { return }
         let calendar = Calendar.current
-        if calendar.isDateInToday(date) { return "Today" }
-        if calendar.isDateInYesterday(date) { return "Yesterday" }
-        if calendar.isDateInTomorrow(date) { return "Tomorrow" }
-        return date.formatted(.dateTime.month(.abbreviated).day())
+        let time = calendar.dateComponents([.hour, .minute, .second], from: current)
+
+        let targetDay: Date = if day == "Yesterday" {
+            calendar.date(byAdding: .day, value: -1, to: calendar.startOfDay(for: Date()))!
+        } else {
+            calendar.startOfDay(for: Date())
+        }
+
+        var merged = calendar.dateComponents([.year, .month, .day], from: targetDay)
+        merged.hour = time.hour
+        merged.minute = time.minute
+        merged.second = time.second
+        activityManager.nursingStartTime = calendar.date(from: merged)
     }
 
     // MARK: - Action Buttons

@@ -14,13 +14,13 @@ struct LogView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
                 TimelineView(activities: scenario.today.allActivities)
-                    .padding(.horizontal, BTSpacing.md)
-                    .padding(.top, BTSpacing.md)
+                    .padding(.horizontal, BTSpacing.pageMargin)
+                    .padding(.top, 16)
 
-                Spacer(minLength: BTSpacing.xxl)
+                Spacer(minLength: 48)
             }
         }
-        .background(BTColors.surfacePage)
+        .background(Color.btBackground)
     }
 }
 

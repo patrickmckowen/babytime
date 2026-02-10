@@ -38,10 +38,11 @@ struct ContentView: View {
 private struct AddPlaceholderView: View {
     var body: some View {
         ZStack {
-            BTColors.surfacePage.ignoresSafeArea()
+            Color.btBackground.ignoresSafeArea()
             Text("Add")
                 .font(BTTypography.label)
-                .foregroundStyle(BTColors.textSecondary)
+                .tracking(BTTracking.label)
+                .foregroundStyle(Color.btTextSecondary)
         }
     }
 }

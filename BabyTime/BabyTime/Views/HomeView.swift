@@ -2,7 +2,7 @@
 //  HomeView.swift
 //  BabyTime
 //
-//  Main home screen with What's Next and Timeline.
+//  Scrollable home screen with photo header, feed/sleep cards, and today summary.
 //
 
 import SwiftUI
@@ -12,68 +12,48 @@ struct HomeView: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 0) {
-                // Header
-                HomeHeader(babyName: scenario.baby.name)
-                    .padding(.horizontal, BTSpacing.md)
-                    .padding(.top, BTSpacing.md)
-
-                // Eating Card
-                EatingCardView(
-                    timeSinceLastFeed: scenario.timeSinceLastFeedFormatted,
-                    feedCount: scenario.feedCount,
-                    totalOz: scenario.totalIntakeOz,
-                    dailyGoal: scenario.baby.ageBracket.dailyIntakeOz,
-                    hasEstimates: scenario.hasNursingEstimates,
-                    onAddFeed: { }
+            VStack(spacing: 0) {
+                // 1. Baby photo header (fullbleed)
+                BabyPhotoHeader(
+                    babyName: scenario.baby.name,
+                    dateString: scenario.dateDisplayString,
+                    ageString: scenario.ageDisplayString
                 )
-                .padding(.horizontal, BTSpacing.md)
-                .padding(.top, BTSpacing.xl)
 
-                // Sleeping Card
-                SleepingCardView(
-                    awakeTime: scenario.awakeTimeFormatted,
-                    sleepingTime: nil, // TODO: Add support for active sleep timer
-                    napCount: scenario.napCount,
-                    totalSleepFormatted: scenario.totalSleepFormatted,
-                    dailyGoal: scenario.baby.ageBracket.dailySleepHours,
-                    totalSleepMinutes: scenario.totalSleepMinutes,
-                    onStartNap: { }
-                )
-                .padding(.horizontal, BTSpacing.md)
-                .padding(.top, BTSpacing.md)
+                // Cards section
+                VStack(spacing: BTSpacing.cardGap) {
+                    // 2. Feed card
+                    FeedCard(
+                        offerAmountOz: scenario.offerAmountOz,
+                        nextFeedTime: scenario.nextFeedTimeFormatted,
+                        lastFeedAmount: scenario.lastFeedOzFormatted,
+                        lastFeedAgo: scenario.timeSinceLastFeedDuration
+                    )
 
-                Spacer(minLength: BTSpacing.xxl)
+                    // 3. Sleep card
+                    SleepCard(
+                        awakeDuration: scenario.wakeWindowFormatted,
+                        lastSleepDuration: scenario.lastSleepDurationFormatted,
+                        lastSleepTime: scenario.lastSleepTimeFormatted
+                    )
+
+                    // 4. Today summary
+                    TodaySummaryCard(
+                        totalSleep: scenario.totalSleepFormatted,
+                        longestSleep: scenario.longestSleepFormatted,
+                        napCount: scenario.napCount,
+                        totalOz: scenario.totalOzFormatted,
+                        feedCount: scenario.feedCount,
+                        averageOz: scenario.averageOzFormatted
+                    )
+                }
+                .padding(.top, BTSpacing.photoToCard)
+                .padding(.horizontal, BTSpacing.pageMargin)
+                .padding(.bottom, 40)
             }
         }
-        .background(BTColors.surfacePage)
-    }
-
-}
-
-// MARK: - Home Header
-
-private struct HomeHeader: View {
-    let babyName: String
-
-    var body: some View {
-        HStack(spacing: BTSpacing.sm) {
-            // Profile placeholder
-            Circle()
-                .fill(BTColors.actionPrimarySubtle)
-                .frame(width: 36, height: 36)
-                .overlay(
-                    Text(String(babyName.prefix(1)))
-                        .font(.system(size: 16, weight: .medium))
-                        .foregroundStyle(BTColors.actionPrimary)
-                )
-
-            Text(babyName)
-                .font(BTTypography.label)
-                .foregroundStyle(BTColors.textPrimary)
-
-            Spacer()
-        }
+        .background(Color.btBackground)
+        .ignoresSafeArea(.container, edges: .top)
     }
 }
 
@@ -81,9 +61,4 @@ private struct HomeHeader: View {
 
 #Preview("Home") {
     HomeView(scenario: .preview)
-}
-
-#Preview("Home - Dark") {
-    HomeView(scenario: .preview)
-        .preferredColorScheme(.dark)
 }

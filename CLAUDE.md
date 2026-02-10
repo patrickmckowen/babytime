@@ -11,3 +11,6 @@ Read BABYTIME.md for product vision and principles.
 - Use Swift's new Observation framework (@Observable)
 - Prefer semantic design tokens over hardcoded colors/sizes
 - No UIKit unless absolutely necessary
+
+## Git Workflow
+- Default base branch for PRs: `main`

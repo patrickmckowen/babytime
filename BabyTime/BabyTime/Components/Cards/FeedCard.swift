@@ -28,8 +28,8 @@ struct FeedCard: View {
                 .foregroundStyle(Color.btTextPrimary)
                 .padding(.top, BTSpacing.labelToHeadline)
 
-            // Detail: "Last fed 4 oz 1h 25m ago"
-            Text("Last fed \(lastFeedAmount) \(lastFeedAgo) ago")
+            // Detail: "Last fed 1h 25m ago · 4 oz"
+            Text("Last fed \(lastFeedAgo) ago · \(lastFeedAmount)")
                 .font(BTTypography.label)
                 .tracking(BTTracking.label)
                 .foregroundStyle(Color.btTextSecondary)

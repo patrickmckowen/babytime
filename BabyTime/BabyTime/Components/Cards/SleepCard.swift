@@ -27,8 +27,8 @@ struct SleepCard: View {
                 .foregroundStyle(Color.btTextPrimary)
                 .padding(.top, BTSpacing.labelToHeadline)
 
-            // Detail: "Last slept 45m at 11:15 AM"
-            Text("Last slept \(lastSleepDuration) at \(lastSleepTime)")
+            // Detail: "Last slept at 1:15 PM · 20m"
+            Text("Last slept at \(lastSleepTime) · \(lastSleepDuration)")
                 .font(BTTypography.label)
                 .tracking(BTTracking.label)
                 .foregroundStyle(Color.btTextSecondary)

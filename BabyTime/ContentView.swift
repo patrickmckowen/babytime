@@ -10,10 +10,14 @@ import SwiftUI
 struct ContentView: View {
     @Environment(ActivityManager.self) private var activityManager
     @State private var showNursingSheet = false
+    @State private var showSleepSheet = false
 
     var body: some View {
         NavigationStack {
-            HomeView(onNursingTap: { showNursingSheet = true })
+            HomeView(
+                onNursingTap: { showNursingSheet = true },
+                onSleepTap: { showSleepSheet = true }
+            )
                 .toolbar {
                     ToolbarItemGroup(placement: .bottomBar) {
                         Button {
@@ -29,7 +33,7 @@ struct ContentView: View {
                         }
 
                         Button {
-                            // Nap — placeholder
+                            showSleepSheet = true
                         } label: {
                             Image(systemName: "moon.zzz.fill")
                         }
@@ -38,6 +42,9 @@ struct ContentView: View {
         }
         .sheet(isPresented: $showNursingSheet) {
             NursingSheetView()
+        }
+        .sheet(isPresented: $showSleepSheet) {
+            SleepSheetView()
         }
     }
 }

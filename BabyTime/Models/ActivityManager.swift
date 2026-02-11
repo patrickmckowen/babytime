@@ -25,6 +25,12 @@ final class ActivityManager {
     var nursingStartTime: Date?
     var nursingEndTime: Date?
 
+    // MARK: - Sleep Timer State
+
+    private(set) var isSleepActive: Bool = false
+    var sleepStartTime: Date?
+    var sleepEndTime: Date?
+
     // MARK: - Init
 
     init(scenario: Scenario = .preview) {
@@ -67,6 +73,62 @@ final class ActivityManager {
         feeds.append(feed)
         currentTime = Date()
         resetNursing()
+    }
+
+    // MARK: - Sleep Timer Actions
+
+    func startSleep() {
+        sleepStartTime = Date()
+        sleepEndTime = nil
+        isSleepActive = true
+    }
+
+    func stopSleep() {
+        sleepEndTime = Date()
+        isSleepActive = false
+    }
+
+    func resetSleep() {
+        sleepStartTime = nil
+        sleepEndTime = nil
+        isSleepActive = false
+    }
+
+    func saveSleep() {
+        guard let start = sleepStartTime else { return }
+        let end = sleepEndTime ?? Date()
+
+        let sleep = SleepActivity(
+            id: UUID(),
+            startTime: start,
+            endTime: end
+        )
+        sleeps.append(sleep)
+        currentTime = Date()
+        resetSleep()
+    }
+
+    // MARK: - Sleep Display Helpers
+
+    var sleepElapsedSeconds: TimeInterval {
+        guard let start = sleepStartTime else { return 0 }
+        if let end = sleepEndTime {
+            return end.timeIntervalSince(start)
+        }
+        return Date().timeIntervalSince(start)
+    }
+
+    var hasSleepSession: Bool {
+        sleepStartTime != nil
+    }
+
+    func sleepTimerString(at date: Date = Date()) -> String {
+        guard let start = sleepStartTime else { return "00:00" }
+        let reference = sleepEndTime ?? date
+        let elapsed = max(0, reference.timeIntervalSince(start))
+        let minutes = Int(elapsed) / 60
+        let seconds = Int(elapsed) % 60
+        return String(format: "%02d:%02d", minutes, seconds)
     }
 
     // MARK: - Nursing Display Helpers

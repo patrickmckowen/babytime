@@ -75,6 +75,18 @@ final class ActivityManager {
         resetNursing()
     }
 
+    // MARK: - Bottle Actions
+
+    func saveBottle(amountOz: Double) {
+        let feed = FeedActivity(
+            id: UUID(),
+            startTime: Date(),
+            type: .bottle(source: .formula, amountOz: amountOz)
+        )
+        feeds.append(feed)
+        currentTime = Date()
+    }
+
     // MARK: - Sleep Timer Actions
 
     func startSleep() {

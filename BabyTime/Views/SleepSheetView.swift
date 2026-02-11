@@ -77,8 +77,8 @@ struct SleepSheetView: View {
             }
 
             Text(timerHintText)
-                .font(.system(size: 13, weight: .regular))
-                .foregroundStyle(Color.btTextSecondary.opacity(0.6))
+                .font(.system(size: 15, weight: .medium))
+                .foregroundStyle(Color.btTextSecondary)
         }
     }
 

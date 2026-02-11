@@ -37,7 +37,8 @@ struct HomeView: View {
                                 nextFeedTime: activityManager.nextFeedTimeFormatted,
                                 lastFeedAmount: activityManager.lastFeedOzFormatted,
                                 lastFeedAgo: activityManager.timeSinceLastFeedDuration
-                            )
+                            ),
+                            onTap: nil
                         )
                     }
 
@@ -54,7 +55,7 @@ struct HomeView: View {
                                 lastSleepDuration: activityManager.lastSleepDurationFormatted,
                                 lastSleepTime: activityManager.lastSleepTimeFormatted
                             ),
-                            onTap: onSleepTap
+                            onTap: nil
                         )
                     }
 

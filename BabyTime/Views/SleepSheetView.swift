@@ -1,13 +1,13 @@
 //
-//  NursingSheetView.swift
+//  SleepSheetView.swift
 //  BabyTime
 //
-//  Nursing session sheet: start/stop timer, editable times, save/reset.
+//  Sleep session sheet: start/stop timer, editable times, save/reset.
 //
 
 import SwiftUI
 
-struct NursingSheetView: View {
+struct SleepSheetView: View {
     @Environment(ActivityManager.self) private var activityManager
     @Environment(\.dismiss) private var dismiss
 
@@ -36,7 +36,7 @@ struct NursingSheetView: View {
             .padding(.horizontal, BTSpacing.pageMargin)
             .padding(.bottom, BTSpacing.pageMargin)
             .background(Color.btBackground)
-            .navigationTitle("Nursing")
+            .navigationTitle("Sleep")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -54,15 +54,13 @@ struct NursingSheetView: View {
     // MARK: - Timer Actions
 
     private func toggleTimer() {
-        if activityManager.isNursingActive {
-            activityManager.stopNursing()
+        if activityManager.isSleepActive {
+            activityManager.stopSleep()
         } else {
-            // Start or restart
-            if activityManager.hasNursingSession && !activityManager.isNursingActive {
-                // Reset and start new session
-                activityManager.resetNursing()
+            if activityManager.hasSleepSession && !activityManager.isSleepActive {
+                activityManager.resetSleep()
             }
-            activityManager.startNursing()
+            activityManager.startSleep()
         }
     }
 
@@ -71,7 +69,7 @@ struct NursingSheetView: View {
     private var timerDisplay: some View {
         VStack(spacing: 8) {
             SwiftUI.TimelineView(.periodic(from: .now, by: 1)) { context in
-                Text(activityManager.nursingTimerString(at: context.date))
+                Text(activityManager.sleepTimerString(at: context.date))
                     .font(.system(size: 64, weight: .regular, design: .default))
                     .monospacedDigit()
                     .tracking(-2)
@@ -85,7 +83,7 @@ struct NursingSheetView: View {
     }
 
     private var timerHintText: String {
-        if activityManager.isNursingActive {
+        if activityManager.isSleepActive {
             return "Tap to stop"
         } else {
             return "Tap to start"
@@ -99,7 +97,7 @@ struct NursingSheetView: View {
         @Bindable var manager = activityManager
 
         VStack(spacing: 0) {
-            // Start time row - always visible
+            // Start time row
             HStack {
                 Text("Start")
                     .font(BTTypography.label)
@@ -109,7 +107,6 @@ struct NursingSheetView: View {
                 Spacer()
 
                 HStack(spacing: 12) {
-                    // Day select menu — Today / Yesterday
                     Menu {
                         Button("Today") { updateStartDay(to: "Today") }
                         Button("Yesterday") { updateStartDay(to: "Yesterday") }
@@ -123,12 +120,11 @@ struct NursingSheetView: View {
                             .clipShape(Capsule())
                     }
 
-                    // Time picker — fully native
                     DatePicker(
                         "",
                         selection: Binding(
-                            get: { manager.nursingStartTime ?? Date() },
-                            set: { manager.nursingStartTime = $0 }
+                            get: { manager.sleepStartTime ?? Date() },
+                            set: { manager.sleepStartTime = $0 }
                         ),
                         displayedComponents: [.hourAndMinute]
                     )
@@ -140,7 +136,7 @@ struct NursingSheetView: View {
             Divider()
                 .foregroundStyle(Color.btDivider)
 
-            // End time row - always visible, disabled until stopped
+            // End time row
             HStack {
                 Text("End")
                     .font(BTTypography.label)
@@ -149,19 +145,19 @@ struct NursingSheetView: View {
 
                 Spacer()
 
-                let hasEnd = manager.nursingEndTime != nil
+                let hasEnd = manager.sleepEndTime != nil
 
                 DatePicker(
                     "",
                     selection: Binding(
-                        get: { manager.nursingEndTime ?? Date() },
-                        set: { manager.nursingEndTime = $0 }
+                        get: { manager.sleepEndTime ?? Date() },
+                        set: { manager.sleepEndTime = $0 }
                     ),
                     displayedComponents: [.hourAndMinute]
                 )
                 .labelsHidden()
-                .disabled(!hasEnd || activityManager.isNursingActive)
-                .opacity(hasEnd ? (activityManager.isNursingActive ? 0.5 : 1.0) : 0.0)
+                .disabled(!hasEnd || activityManager.isSleepActive)
+                .opacity(hasEnd ? (activityManager.isSleepActive ? 0.5 : 1.0) : 0.0)
                 .overlay {
                     if !hasEnd {
                         Text("—")
@@ -180,10 +176,10 @@ struct NursingSheetView: View {
         .padding(.vertical, 4)
     }
 
-    // MARK: - Date Label
+    // MARK: - Date Labels
 
     private var startDateLabel: String {
-        guard let date = activityManager.nursingStartTime else { return "Today" }
+        guard let date = activityManager.sleepStartTime else { return "Today" }
         if Calendar.current.isDateInYesterday(date) { return "Yesterday" }
         return "Today"
     }
@@ -191,9 +187,13 @@ struct NursingSheetView: View {
     // MARK: - Day Selection
 
     private func updateStartDay(to day: String) {
-        guard let current = activityManager.nursingStartTime else { return }
+        guard let current = activityManager.sleepStartTime else { return }
+        activityManager.sleepStartTime = shiftDate(current, toDay: day)
+    }
+
+    private func shiftDate(_ date: Date, toDay day: String) -> Date {
         let calendar = Calendar.current
-        let time = calendar.dateComponents([.hour, .minute, .second], from: current)
+        let time = calendar.dateComponents([.hour, .minute, .second], from: date)
 
         let targetDay: Date = if day == "Yesterday" {
             calendar.date(byAdding: .day, value: -1, to: calendar.startOfDay(for: Date()))!
@@ -205,16 +205,15 @@ struct NursingSheetView: View {
         merged.hour = time.hour
         merged.minute = time.minute
         merged.second = time.second
-        activityManager.nursingStartTime = calendar.date(from: merged)
+        return calendar.date(from: merged) ?? date
     }
 
     // MARK: - Action Buttons
 
     private var actionButtons: some View {
         HStack(spacing: 14) {
-            // Reset
             Button {
-                activityManager.resetNursing()
+                activityManager.resetSleep()
             } label: {
                 Text("Reset")
                     .font(BTTypography.label)
@@ -226,11 +225,10 @@ struct NursingSheetView: View {
                     .clipShape(Capsule())
                     .cardShadow()
             }
-            .disabled(!activityManager.hasNursingSession)
+            .disabled(!activityManager.hasSleepSession)
 
-            // Save
             Button {
-                activityManager.saveNursing()
+                activityManager.saveSleep()
                 dismiss()
             } label: {
                 Text("Save")
@@ -239,16 +237,16 @@ struct NursingSheetView: View {
                     .foregroundStyle(.white)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 16)
-                    .background(Color.btFeedAccent)
+                    .background(Color.btSleepAccent)
                     .clipShape(Capsule())
                     .cardShadow()
             }
-            .disabled(!activityManager.hasNursingSession)
+            .disabled(!activityManager.hasSleepSession)
         }
     }
 }
 
 #Preview {
-    NursingSheetView()
+    SleepSheetView()
         .environment(ActivityManager())
 }

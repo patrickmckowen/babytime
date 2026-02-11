@@ -10,6 +10,7 @@ import SwiftUI
 struct HomeView: View {
     @Environment(ActivityManager.self) private var activityManager
     var onNursingTap: (() -> Void)?
+    var onSleepTap: (() -> Void)?
 
     var body: some View {
         ScrollView {
@@ -36,16 +37,27 @@ struct HomeView: View {
                                 nextFeedTime: activityManager.nextFeedTimeFormatted,
                                 lastFeedAmount: activityManager.lastFeedOzFormatted,
                                 lastFeedAgo: activityManager.timeSinceLastFeedDuration
-                            )
+                            ),
+                            onTap: nil
                         )
                     }
 
                     // 3. Sleep card
-                    SleepCard(
-                        awakeDuration: activityManager.wakeWindowFormatted,
-                        lastSleepDuration: activityManager.lastSleepDurationFormatted,
-                        lastSleepTime: activityManager.lastSleepTimeFormatted
-                    )
+                    if activityManager.isSleepActive || activityManager.hasSleepSession {
+                        SleepCard(
+                            mode: .sleepActive,
+                            onTap: onSleepTap
+                        )
+                    } else {
+                        SleepCard(
+                            mode: .awake(
+                                duration: activityManager.wakeWindowFormatted,
+                                lastSleepDuration: activityManager.lastSleepDurationFormatted,
+                                lastSleepTime: activityManager.lastSleepTimeFormatted
+                            ),
+                            onTap: nil
+                        )
+                    }
 
                     // 4. Today summary
                     TodaySummaryCard(

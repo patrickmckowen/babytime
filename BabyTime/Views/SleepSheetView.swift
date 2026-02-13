@@ -18,8 +18,8 @@ struct SleepSheetView: View {
     @State private var draftStartTime: Date?
     @State private var draftEndTime: Date?
 
-    // Suppresses timer toggle when a DatePicker popover is open
-    @State private var isPickerActive = false
+    // Cooldown: suppresses timer toggle briefly after a DatePicker tap
+    @State private var pickerInteractionDate: Date?
 
     // Effective times: event takes precedence over draft
     private var effectiveStartTime: Date? {
@@ -38,6 +38,11 @@ struct SleepSheetView: View {
         activityManager.hasSleepSession || draftStartTime != nil || draftEndTime != nil
     }
 
+    private var isPickerRecentlyActive: Bool {
+        guard let d = pickerInteractionDate else { return false }
+        return Date().timeIntervalSince(d) < 0.5
+    }
+
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
@@ -50,11 +55,8 @@ struct SleepSheetView: View {
                 .frame(maxWidth: .infinity)
                 .contentShape(Rectangle())
                 .onTapGesture {
-                    if isPickerActive {
-                        isPickerActive = false
-                    } else {
-                        toggleTimer()
-                    }
+                    guard !isPickerRecentlyActive else { return }
+                    toggleTimer()
                 }
 
                 // Start / End time rows (always visible)
@@ -103,7 +105,16 @@ struct SleepSheetView: View {
 
     private func durationString(at date: Date) -> String {
         guard let start = effectiveStartTime else { return "00:00" }
-        let reference = effectiveEndTime ?? date
+
+        let reference: Date
+        if activityManager.isSleepActive {
+            reference = date                      // live ticking
+        } else if let end = effectiveEndTime {
+            reference = end                       // static stopped/draft duration
+        } else {
+            return "00:00"                        // draft start only → no duration yet
+        }
+
         let elapsed = max(0, reference.timeIntervalSince(start))
         let minutes = Int(elapsed) / 60
         let seconds = Int(elapsed) % 60
@@ -153,10 +164,11 @@ struct SleepSheetView: View {
                 DatePicker(
                     "",
                     selection: startTimeBinding,
+                    in: ...Date(),
                     displayedComponents: [.hourAndMinute]
                 )
                 .labelsHidden()
-                .simultaneousGesture(TapGesture().onEnded { isPickerActive = true })
+                .simultaneousGesture(TapGesture().onEnded { pickerInteractionDate = Date() })
             }
             .padding(.vertical, 14)
 
@@ -175,6 +187,7 @@ struct SleepSheetView: View {
                 DatePicker(
                     "",
                     selection: endTimeBinding,
+                    in: ...Date(),
                     displayedComponents: [.hourAndMinute]
                 )
                 .labelsHidden()
@@ -188,7 +201,10 @@ struct SleepSheetView: View {
                             .frame(maxWidth: .infinity, alignment: .trailing)
                     }
                 }
-                .simultaneousGesture(TapGesture().onEnded { isPickerActive = true })
+                .simultaneousGesture(TapGesture().onEnded {
+                    guard !activityManager.isSleepActive else { return }
+                    pickerInteractionDate = Date()
+                })
             }
             .padding(.vertical, 14)
         }

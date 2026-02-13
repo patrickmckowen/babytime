@@ -178,10 +178,11 @@ final class ActivityManager {
     }
 
     func saveNursing() {
-        if let event = activeNursingEvent, event.isActive {
+        guard let event = activeNursingEvent else { return }
+        if event.isActive {
             event.endTime = Date()
-            save()
         }
+        save()                  // always persist, even if already stopped
         activeNursingEvent = nil
         refresh()
     }
@@ -238,10 +239,11 @@ final class ActivityManager {
     }
 
     func saveSleep() {
-        if let event = activeSleepEvent, event.isActive {
+        guard let event = activeSleepEvent else { return }
+        if event.isActive {
             event.endTime = Date()
-            save()
         }
+        save()                  // always persist, even if already stopped
         activeSleepEvent = nil
         refresh()
     }
@@ -314,7 +316,16 @@ final class ActivityManager {
 
     func sleepTimerString(at date: Date = Date()) -> String {
         guard let start = sleepStartTime else { return "00:00" }
-        let reference = sleepEndTime ?? date
+
+        let reference: Date
+        if isSleepActive {
+            reference = date
+        } else if let end = sleepEndTime {
+            reference = end
+        } else {
+            return "00:00"
+        }
+
         let elapsed = max(0, reference.timeIntervalSince(start))
         let minutes = Int(elapsed) / 60
         let seconds = Int(elapsed) % 60

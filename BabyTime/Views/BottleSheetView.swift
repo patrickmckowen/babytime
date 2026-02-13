@@ -6,12 +6,14 @@
 //
 
 import SwiftUI
+import SwiftData
 
 struct BottleSheetView: View {
     @Environment(ActivityManager.self) private var activityManager
     @Environment(\.dismiss) private var dismiss
 
     @State private var amountOz: Double = 4.0
+    @State private var selectedTime: Date = Date()
 
     var body: some View {
         NavigationStack {
@@ -24,8 +26,8 @@ struct BottleSheetView: View {
                 }
                 .frame(maxWidth: .infinity)
 
-                // Slider card
-                sliderCard
+                // Controls card
+                controlsCard
 
                 // Cancel / Save buttons
                 actionButtons
@@ -64,50 +66,74 @@ struct BottleSheetView: View {
         return String(format: "%.1f", amountOz)
     }
 
-    // MARK: - Slider Card
+    // MARK: - Controls Card
 
-    private var sliderCard: some View {
-        VStack(spacing: 14) {
-            Slider(value: $amountOz, in: 1...8, step: 0.5)
-                .tint(Color.btFeedAccent)
+    private var controlsCard: some View {
+        VStack(spacing: 0) {
+            // Amount slider
+            VStack(spacing: 14) {
+                Slider(value: $amountOz, in: 1...8, step: 0.5)
+                    .tint(Color.btFeedAccent)
 
-            // Tick marks
-            HStack(spacing: 0) {
-                ForEach(0..<15) { index in
-                    let isWhole = index % 2 == 0
+                // Tick marks
+                HStack(spacing: 0) {
+                    ForEach(0..<15) { index in
+                        let isWhole = index % 2 == 0
 
-                    if index > 0 {
-                        Spacer(minLength: 0)
-                    }
+                        if index > 0 {
+                            Spacer(minLength: 0)
+                        }
 
-                    Circle()
-                        .fill(Color.btTextSecondary.opacity(isWhole ? 0.4 : 0.2))
-                        .frame(width: isWhole ? 5 : 3, height: isWhole ? 5 : 3)
+                        Circle()
+                            .fill(Color.btTextSecondary.opacity(isWhole ? 0.4 : 0.2))
+                            .frame(width: isWhole ? 5 : 3, height: isWhole ? 5 : 3)
 
-                    if index < 14 {
-                        Spacer(minLength: 0)
+                        if index < 14 {
+                            Spacer(minLength: 0)
+                        }
                     }
                 }
-            }
-            .padding(.horizontal, 4)
+                .padding(.horizontal, 4)
 
-            // End labels
-            HStack {
-                Text("1")
-                    .font(BTTypography.caption)
-                    .foregroundStyle(Color.btTextSecondary)
-                Spacer()
-                Text("8")
-                    .font(BTTypography.caption)
-                    .foregroundStyle(Color.btTextSecondary)
+                // End labels
+                HStack {
+                    Text("1")
+                        .font(BTTypography.caption)
+                        .foregroundStyle(Color.btTextSecondary)
+                    Spacer()
+                    Text("8")
+                        .font(BTTypography.caption)
+                        .foregroundStyle(Color.btTextSecondary)
+                }
             }
+            .padding(.horizontal, BTSpacing.cardPaddingHorizontal)
+            .padding(.vertical, 20)
+
+            // Divider
+            Rectangle()
+                .fill(Color.btDivider)
+                .frame(height: 1)
+                .padding(.horizontal, BTSpacing.cardPaddingHorizontal)
+
+            // Time row
+            HStack {
+                Text("Time")
+                    .font(BTTypography.label)
+                    .tracking(BTTracking.label)
+                    .foregroundStyle(Color.btTextPrimary)
+
+                Spacer()
+
+                DatePicker("", selection: $selectedTime, in: ...Date(), displayedComponents: [.hourAndMinute])
+                    .labelsHidden()
+                    .tint(Color.btFeedAccent)
+            }
+            .padding(.horizontal, BTSpacing.cardPaddingHorizontal)
+            .padding(.vertical, 16)
         }
-        .padding(.horizontal, BTSpacing.cardPaddingHorizontal)
-        .padding(.vertical, 20)
         .background(Color.btBackground)
         .clipShape(RoundedRectangle(cornerRadius: BTRadius.card, style: .continuous))
         .cardShadow()
-        .padding(.vertical, 4)
     }
 
     // MARK: - Action Buttons
@@ -131,7 +157,7 @@ struct BottleSheetView: View {
 
             // Save
             Button {
-                activityManager.saveBottle(amountOz: amountOz)
+                activityManager.saveBottle(amountOz: amountOz, at: selectedTime)
                 dismiss()
             } label: {
                 Text("Save")
@@ -149,6 +175,10 @@ struct BottleSheetView: View {
 }
 
 #Preview {
+    let container = try! ModelContainer(
+        for: Baby.self, FeedEvent.self, SleepEvent.self,
+        configurations: ModelConfiguration(isStoredInMemoryOnly: true)
+    )
     BottleSheetView()
-        .environment(ActivityManager())
+        .environment(ActivityManager(modelContext: container.mainContext))
 }

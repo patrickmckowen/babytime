@@ -49,12 +49,23 @@ final class ActivityManager {
     }
 
     @discardableResult
-    func addBaby(name: String, birthdate: Date, bedtimeHour: Int = 19, bedtimeMinute: Int = 0) -> Baby {
+    func addBaby(
+        name: String,
+        birthdate: Date,
+        bedtimeHour: Int = 19,
+        bedtimeMinute: Int = 0,
+        dreamFeedEnabled: Bool = false,
+        dreamFeedHour: Int = 22,
+        dreamFeedMinute: Int = 0
+    ) -> Baby {
         let baby = Baby(
             name: name,
             birthdate: birthdate,
             bedtimeHour: bedtimeHour,
-            bedtimeMinute: bedtimeMinute
+            bedtimeMinute: bedtimeMinute,
+            dreamFeedEnabled: dreamFeedEnabled,
+            dreamFeedHour: dreamFeedHour,
+            dreamFeedMinute: dreamFeedMinute
         )
         modelContext.insert(baby)
         save()
@@ -177,11 +188,11 @@ final class ActivityManager {
 
     // MARK: - Bottle Actions
 
-    func saveBottle(amountOz: Double, source: BottleSource = .breastMilk) {
+    func saveBottle(amountOz: Double, source: BottleSource = .breastMilk, at time: Date = Date()) {
         guard let baby else { return }
         let event = FeedEvent(
-            startTime: Date(),
-            endTime: Date(),
+            startTime: time,
+            endTime: time,
             kind: .bottle,
             source: source,
             amountOz: amountOz,
@@ -194,12 +205,19 @@ final class ActivityManager {
 
     // MARK: - Sleep Actions
 
-    func startSleep() {
+    func startSleep(at startTime: Date? = nil) {
         guard let baby else { return }
-        let event = SleepEvent(startTime: Date(), baby: baby)
+        let event = SleepEvent(startTime: startTime ?? Date(), baby: baby)
         modelContext.insert(event)
         save()
         activeSleepEvent = event
+        refresh()
+    }
+
+    func resumeSleep() {
+        guard let event = activeSleepEvent else { return }
+        event.endTime = nil
+        save()
         refresh()
     }
 
@@ -224,6 +242,15 @@ final class ActivityManager {
             event.endTime = Date()
             save()
         }
+        activeSleepEvent = nil
+        refresh()
+    }
+
+    func saveSleepManual(startTime: Date, endTime: Date) {
+        guard let baby else { return }
+        let event = SleepEvent(startTime: startTime, endTime: endTime, baby: baby)
+        modelContext.insert(event)
+        save()
         activeSleepEvent = nil
         refresh()
     }

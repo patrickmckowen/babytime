@@ -24,7 +24,7 @@ extension Scenario {
             return calendar.date(from: components)!
         }
 
-        let baby = Baby(
+        let baby = LegacyBaby(
             id: UUID(),
             name: "Kaia",
             birthdate: calendar.date(from: DateComponents(year: 2025, month: 10, day: 17))!
@@ -362,10 +362,5 @@ extension Date {
     func formatted(as style: Date.FormatStyle.TimeStyle) -> String {
         self.formatted(date: .omitted, time: style)
     }
-
-    var shortTime: String {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "h:mm a"
-        return formatter.string(from: self)
-    }
+    // shortTime moved to Design/DateFormatting.swift
 }

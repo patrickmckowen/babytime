@@ -3,9 +3,11 @@
 //  BabyTime
 //
 //  Nursing session sheet: start/stop timer, editable times, save/reset.
+//  Timer persists immediately to SwiftData for multi-device sync.
 //
 
 import SwiftUI
+import SwiftData
 
 struct NursingSheetView: View {
     @Environment(ActivityManager.self) private var activityManager
@@ -56,12 +58,11 @@ struct NursingSheetView: View {
     private func toggleTimer() {
         if activityManager.isNursingActive {
             activityManager.stopNursing()
+        } else if activityManager.hasNursingSession {
+            // Session exists but stopped — reset and start new
+            activityManager.resetNursing()
+            activityManager.startNursing()
         } else {
-            // Start or restart
-            if activityManager.hasNursingSession && !activityManager.isNursingActive {
-                // Reset and start new session
-                activityManager.resetNursing()
-            }
             activityManager.startNursing()
         }
     }
@@ -249,6 +250,10 @@ struct NursingSheetView: View {
 }
 
 #Preview {
+    let container = try! ModelContainer(
+        for: Baby.self, FeedEvent.self, SleepEvent.self,
+        configurations: ModelConfiguration(isStoredInMemoryOnly: true)
+    )
     NursingSheetView()
-        .environment(ActivityManager())
+        .environment(ActivityManager(modelContext: container.mainContext))
 }

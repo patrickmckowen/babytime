@@ -7,6 +7,7 @@
 
 import SwiftUI
 import SwiftData
+import PhotosUI
 
 struct SettingsView: View {
     @Environment(ActivityManager.self) private var activityManager
@@ -313,6 +314,8 @@ struct WelcomeView: View {
     @State private var dreamFeedTime = Calendar.current.date(
         from: DateComponents(hour: 22, minute: 0)
     ) ?? Date()
+    @State private var selectedPhoto: PhotosPickerItem?
+    @State private var photoData: Data?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -325,15 +328,38 @@ struct WelcomeView: View {
 
             Spacer()
 
-            // Profile image placeholder
-            RoundedRectangle(cornerRadius: BTRadius.card, style: .continuous)
-                .fill(Color.btPhotoPlaceholder)
-                .frame(width: 200, height: 200)
-                .overlay {
-                    Image(systemName: "photo.on.rectangle.angled")
-                        .font(.system(size: 48))
-                        .foregroundStyle(Color.btTextMuted)
+            // Profile image picker
+            PhotosPicker(selection: $selectedPhoto, matching: .images) {
+                Group {
+                    if let photoData, let uiImage = UIImage(data: photoData) {
+                        Image(uiImage: uiImage)
+                            .resizable()
+                            .scaledToFill()
+                            .frame(width: 200, height: 200)
+                            .clipShape(RoundedRectangle(cornerRadius: BTRadius.card, style: .continuous))
+                    } else {
+                        RoundedRectangle(cornerRadius: BTRadius.card, style: .continuous)
+                            .fill(Color.btPhotoPlaceholder)
+                            .frame(width: 200, height: 200)
+                            .overlay {
+                                Image(systemName: "photo.on.rectangle.angled")
+                                    .font(.system(size: 48))
+                                    .foregroundStyle(Color.btTextMuted)
+                            }
+                    }
                 }
+                .animation(.easeInOut(duration: 0.3), value: photoData)
+            }
+            .onChange(of: selectedPhoto) { _, newItem in
+                guard let newItem else { return }
+                Task {
+                    if let data = try? await newItem.loadTransferable(type: Data.self),
+                       let compressed = ImageUtilities.resizeForProfile(data: data) {
+                        photoData = compressed
+                    }
+                    selectedPhoto = nil
+                }
+            }
 
             Spacer()
 
@@ -386,7 +412,8 @@ struct WelcomeView: View {
                     bedtimeMinute: bedtimeComponents.minute ?? 0,
                     dreamFeedEnabled: dreamFeedEnabled,
                     dreamFeedHour: dreamFeedComponents.hour ?? 22,
-                    dreamFeedMinute: dreamFeedComponents.minute ?? 0
+                    dreamFeedMinute: dreamFeedComponents.minute ?? 0,
+                    photoData: photoData
                 )
                 activityManager.selectBaby(baby)
             } label: {

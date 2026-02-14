@@ -23,6 +23,9 @@ final class Baby {
     var dreamFeedHour: Int = 22
     var dreamFeedMinute: Int = 30
 
+    /// Profile photo — stored externally via CloudKit CKAsset
+    @Attribute(.externalStorage) var photoData: Data?
+
     var createdAt: Date = Date()
 
     @Relationship(deleteRule: .cascade, inverse: \FeedEvent.baby)
@@ -31,6 +34,9 @@ final class Baby {
     @Relationship(deleteRule: .cascade, inverse: \SleepEvent.baby)
     var sleepEvents: [SleepEvent]? = []
 
+    @Relationship(deleteRule: .cascade, inverse: \WakeEvent.baby)
+    var wakeEvents: [WakeEvent]? = []
+
     init(
         name: String,
         birthdate: Date,
@@ -38,7 +44,8 @@ final class Baby {
         bedtimeMinute: Int = 0,
         dreamFeedEnabled: Bool = false,
         dreamFeedHour: Int = 22,
-        dreamFeedMinute: Int = 30
+        dreamFeedMinute: Int = 30,
+        photoData: Data? = nil
     ) {
         self.stableID = UUID().uuidString
         self.name = name
@@ -48,6 +55,7 @@ final class Baby {
         self.dreamFeedEnabled = dreamFeedEnabled
         self.dreamFeedHour = dreamFeedHour
         self.dreamFeedMinute = dreamFeedMinute
+        self.photoData = photoData
         self.createdAt = Date()
     }
 }

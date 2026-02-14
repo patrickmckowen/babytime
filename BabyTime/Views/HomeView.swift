@@ -14,6 +14,7 @@ struct HomeView: View {
     var onNursingTap: (() -> Void)?
     var onBottleTap: (() -> Void)?
     var onSleepTap: (() -> Void)?
+    var onPhotoTap: (() -> Void)?
 
     var body: some View {
         ScrollView {
@@ -22,7 +23,9 @@ struct HomeView: View {
                 BabyPhotoHeader(
                     babyName: activityManager.babyName,
                     dateString: activityManager.dateDisplayString,
-                    ageString: activityManager.ageDisplayString
+                    ageString: activityManager.ageDisplayString,
+                    photoData: activityManager.babyPhotoData,
+                    onPhotoTap: onPhotoTap
                 )
 
                 // Cards section
@@ -40,7 +43,11 @@ struct HomeView: View {
                         napCount: activityManager.napCount,
                         totalOz: activityManager.totalOzFormatted,
                         feedCount: activityManager.feedCount,
-                        averageOz: activityManager.averageOzFormatted
+                        averageOz: activityManager.averageOzFormatted,
+                        wakeTime: activityManager.hasWakeTime ? activityManager.wakeTimeFormatted : nil,
+                        onWakeTimeChanged: { time in
+                            activityManager.setWakeTime(time)
+                        }
                     )
                 }
                 .padding(.top, BTSpacing.photoToCard)
@@ -91,35 +98,32 @@ struct HomeView: View {
             )
         } else if let snapshot = activityManager.snapshot {
             SleepCard(
-                mode: sleepCardMode(from: snapshot.dayState),
-                onTap: nil
+                mode: sleepCardMode(from: snapshot),
+                onTap: nil,
+                onWakeTimeSubmit: { time in
+                    activityManager.setWakeTime(time)
+                }
             )
         } else {
             SleepCard(
-                mode: .awake(
-                    label: "Good morning",
-                    duration: "--",
-                    detail: "No events yet"
-                ),
-                onTap: nil
+                mode: .wakeTimePrompt(babyName: activityManager.babyName),
+                onWakeTimeSubmit: { time in
+                    activityManager.setWakeTime(time)
+                }
             )
         }
     }
 
-    private func sleepCardMode(from dayState: DayState) -> SleepCard.Mode {
-        switch dayState {
+    private func sleepCardMode(from snapshot: DaySnapshot) -> SleepCard.Mode {
+        switch snapshot.dayState {
         case .notStarted:
-            return .awake(
-                label: "Good morning",
-                duration: "--",
-                detail: "No events yet"
-            )
+            return .wakeTimePrompt(babyName: activityManager.babyName)
 
         case .awakeEarly(let mins, _):
             return .awake(
                 label: "Awake for",
                 duration: formatMinutes(mins),
-                detail: "Last slept at \(activityManager.lastSleepTimeFormatted) \u{00B7} \(activityManager.lastSleepDurationFormatted)"
+                detail: wakeDetail(snapshot: snapshot)
             )
 
         case .awakeApproaching(let mins, let range):
@@ -173,6 +177,16 @@ struct HomeView: View {
         }
     }
 
+    private func wakeDetail(snapshot: DaySnapshot) -> String {
+        if activityManager.lastSleep != nil {
+            return "Last slept at \(activityManager.lastSleepTimeFormatted) \u{00B7} \(activityManager.lastSleepDurationFormatted)"
+        } else if let wakeTime = snapshot.wakeTime {
+            return "Woke at \(wakeTime.shortTime)"
+        } else {
+            return ""
+        }
+    }
+
     private func formatMinutes(_ mins: Int) -> String {
         let hours = mins / 60
         let minutes = mins % 60
@@ -187,7 +201,7 @@ struct HomeView: View {
 
 #Preview("Home") {
     let container = try! ModelContainer(
-        for: Baby.self, FeedEvent.self, SleepEvent.self,
+        for: Baby.self, FeedEvent.self, SleepEvent.self, WakeEvent.self,
         configurations: ModelConfiguration(isStoredInMemoryOnly: true)
     )
     let manager = ActivityManager(modelContext: container.mainContext)

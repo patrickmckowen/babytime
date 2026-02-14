@@ -35,11 +35,15 @@ enum DayEngine {
         let feedCount = completedFeeds.count + (activeFeed != nil ? 1 : 0)
         let currentWW = ageTable.currentWakeWindow(completedNaps: napCount)
 
+        let lastSleepEndDate = latestSleepEnd(completedSleeps)
+        let firstEventDate = earliestEventTime(feeds: feeds, sleeps: sleeps)
+        let wakeReference = lastSleepEndDate ?? wakeTime ?? firstEventDate
+
         let dayState = deriveDayState(
             activeSleep: activeSleep,
-            lastSleepEnd: latestSleepEnd(completedSleeps),
+            lastSleepEnd: lastSleepEndDate,
             wakeTime: wakeTime,
-            firstEventTime: earliestEventTime(feeds: feeds, sleeps: sleeps),
+            firstEventTime: firstEventDate,
             now: now,
             currentWW: currentWW,
             napCutoff: napCutoff,
@@ -61,7 +65,8 @@ enum DayEngine {
             napCutoff: napCutoff,
             bedtime: bedtime,
             ageTable: ageTable,
-            wakeTime: wakeTime
+            wakeTime: wakeTime,
+            wakeReference: wakeReference
         )
     }
 

@@ -36,6 +36,17 @@ enum DayState: Equatable, Sendable {
 
     /// State 8: Bedtime window. Almost there.
     case bedtimeWindow(minutesToBedtime: Int)
+
+    /// Whether this state represents an awake period that needs live duration updates.
+    var isAwakeState: Bool {
+        switch self {
+        case .awakeEarly, .awakeApproaching, .awakeBeyond, .napWindowClosed:
+            return true
+        case .notStarted, .sleepingNoPressure, .sleepingApproachingCutoff,
+             .sleepingMustEnd, .bedtimeWindow:
+            return false
+        }
+    }
 }
 
 /// Feed state runs as a parallel, independent track.
@@ -66,4 +77,8 @@ struct DaySnapshot: Equatable, Sendable {
     let bedtime: Date
     let ageTable: AgeTable
     let wakeTime: Date?
+
+    /// The date used to compute awake duration (lastSleepEnd ?? wakeTime ?? firstEventTime).
+    /// Used by the view layer to live-compute elapsed awake time without recomputing the full snapshot.
+    let wakeReference: Date?
 }

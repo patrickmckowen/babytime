@@ -17,6 +17,7 @@ struct TodaySummaryCard: View {
     let feedCount: Int
     let averageOz: String
     var wakeTime: String? = nil
+    var bedtimeTime: String? = nil
     var onWakeTimeChanged: ((Date) -> Void)? = nil
 
     @State private var isEditingWakeTime = false
@@ -37,37 +38,17 @@ struct TodaySummaryCard: View {
                     .foregroundStyle(Color.btTextSecondary)
             }
 
-            // Wake time row (if set)
-            if let wakeTime {
-                WakeTimeRow(
-                    wakeTime: wakeTime,
-                    isEditing: $isEditingWakeTime,
-                    editTime: $editWakeTime,
-                    onConfirm: {
-                        onWakeTimeChanged?(editWakeTime)
-                        isEditingWakeTime = false
-                    }
-                )
-                .padding(.top, BTSpacing.todayHeaderToRow)
-
-                // Divider
-                Rectangle()
-                    .fill(Color.btDivider)
-                    .frame(height: 1)
-                    .padding(.vertical, BTSpacing.rowDividerPadding)
-            }
-
-            // Sleep row
-            SummaryRow(
-                iconName: "moon.fill",
-                iconColor: .btSleepAccent,
-                columns: [
-                    StatColumn(label: "Naps", value: "\(napCount)"),
-                    StatColumn(label: "Longest", value: longestSleep),
-                    StatColumn(label: "Total", value: totalSleep)
-                ]
+            // Wake time row (always visible)
+            WakeTimeRow(
+                wakeTime: wakeTime ?? "--",
+                isEditing: $isEditingWakeTime,
+                editTime: $editWakeTime,
+                onConfirm: {
+                    onWakeTimeChanged?(editWakeTime)
+                    isEditingWakeTime = false
+                }
             )
-            .padding(.top, wakeTime == nil ? BTSpacing.todayHeaderToRow : 0)
+            .padding(.top, BTSpacing.todayHeaderToRow)
 
             // Divider
             Rectangle()
@@ -85,6 +66,33 @@ struct TodaySummaryCard: View {
                     StatColumn(label: "Total", value: totalOz)
                 ]
             )
+
+            // Divider
+            Rectangle()
+                .fill(Color.btDivider)
+                .frame(height: 1)
+                .padding(.vertical, BTSpacing.rowDividerPadding)
+
+            // Naps row
+            SummaryRow(
+                iconName: "moon.fill",
+                iconColor: .btSleepAccent,
+                columns: [
+                    StatColumn(label: "Naps", value: "\(napCount)"),
+                    StatColumn(label: "Longest", value: longestSleep),
+                    StatColumn(label: "Total", value: totalSleep)
+                ]
+            )
+
+            // Bedtime row
+            if let bedtimeTime {
+                Rectangle()
+                    .fill(Color.btDivider)
+                    .frame(height: 1)
+                    .padding(.vertical, BTSpacing.rowDividerPadding)
+
+                BedtimeRow(bedtime: bedtimeTime)
+            }
         }
         .padding(.top, BTSpacing.cardPaddingTop)
         .padding(.horizontal, BTSpacing.cardPaddingHorizontal)
@@ -209,6 +217,39 @@ private struct WakeTimeRow: View {
     }
 }
 
+// MARK: - Bedtime Row
+
+private struct BedtimeRow: View {
+    let bedtime: String
+
+    var body: some View {
+        HStack(spacing: BTSpacing.iconToStat) {
+            RoundedRectangle(cornerRadius: BTRadius.iconContainer, style: .continuous)
+                .fill(Color.btSleepAccent.opacity(0.10))
+                .frame(width: BTIconSize.container, height: BTIconSize.container)
+                .overlay {
+                    Image(systemName: "moon.stars.fill")
+                        .font(.system(size: 16, weight: .medium))
+                        .foregroundStyle(Color.btSleepAccent)
+                }
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Bedtime")
+                    .font(BTTypography.statLabel)
+                    .tracking(BTTracking.statLabel)
+                    .foregroundStyle(Color.btTextMuted)
+
+                Text(bedtime)
+                    .font(BTTypography.statValue)
+                    .tracking(BTTracking.statValue)
+                    .foregroundStyle(Color.btTextPrimary)
+            }
+
+            Spacer()
+        }
+    }
+}
+
 // MARK: - Preview
 
 #Preview {
@@ -222,7 +263,8 @@ private struct WakeTimeRow: View {
             napCount: 3,
             totalOz: "17 oz",
             feedCount: 4,
-            averageOz: "4.3 oz"
+            averageOz: "4.3 oz",
+            bedtimeTime: "7:00 PM"
         )
         .padding(.horizontal, BTSpacing.pageMargin)
     }

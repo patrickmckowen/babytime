@@ -96,7 +96,7 @@ struct FeedCard: View {
                 .tracking(BTTracking.headlineSmall)
                 .foregroundStyle(Color.btTextPrimary)
 
-            Text("Log a feed")
+            Text("Log the first feed")
                 .font(BTTypography.label)
                 .tracking(BTTracking.label)
                 .foregroundStyle(Color.btTextSecondary)

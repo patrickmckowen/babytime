@@ -397,6 +397,10 @@ final class ActivityManager {
         baby?.name ?? ""
     }
 
+    var bedtimeFormatted: String? {
+        baby?.bedtimeToday().shortTime
+    }
+
     var babyPhotoData: Data? {
         baby?.photoData
     }

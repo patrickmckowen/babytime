@@ -15,6 +15,7 @@ struct HomeView: View {
     var onBottleTap: (() -> Void)?
     var onSleepTap: (() -> Void)?
     var onPhotoTap: (() -> Void)?
+    var onSettingsTap: (() -> Void)?
 
     var body: some View {
         ScrollView {
@@ -23,7 +24,8 @@ struct HomeView: View {
                 BabyPhotoHeader(
                     babyName: activityManager.babyName,
                     photoData: activityManager.babyPhotoData,
-                    onPhotoTap: onPhotoTap
+                    onPhotoTap: onPhotoTap,
+                    onSettingsTap: onSettingsTap
                 )
 
                 // Cards section
@@ -45,6 +47,7 @@ struct HomeView: View {
                         feedCount: activityManager.feedCount,
                         averageOz: activityManager.averageOzFormatted,
                         wakeTime: activityManager.hasWakeTime ? activityManager.wakeTimeFormatted : nil,
+                        bedtimeTime: activityManager.bedtimeFormatted,
                         onWakeTimeChanged: { time in
                             activityManager.setWakeTime(time)
                         }

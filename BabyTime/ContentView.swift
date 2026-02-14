@@ -28,7 +28,8 @@ struct ContentView: View {
                         onNursingTap: { showNursingSheet = true },
                         onBottleTap: { showBottleSheet = true },
                         onSleepTap: { showSleepSheet = true },
-                        onPhotoTap: { showPhotoPicker = true }
+                        onPhotoTap: { showPhotoPicker = true },
+                        onSettingsTap: { showSettings = true }
                     )
                 } else {
                     WelcomeView()
@@ -54,14 +55,6 @@ struct ContentView: View {
                         showSleepSheet = true
                     } label: {
                         Image(systemName: "moon.zzz.fill")
-                    }
-
-                    Spacer()
-
-                    Button {
-                        showSettings = true
-                    } label: {
-                        Image(systemName: "gearshape")
                     }
                 }
             }

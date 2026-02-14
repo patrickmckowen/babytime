@@ -2,211 +2,435 @@
 //  ActivityManager.swift
 //  BabyTime
 //
-//  Observable data manager for activity state and nursing timer.
+//  Observable data manager bridging SwiftData ↔ DayEngine ↔ Views.
+//  Persists active timers immediately for multi-device sync + crash recovery.
 //
 
 import Foundation
 import SwiftUI
+import SwiftData
 
 @Observable
 final class ActivityManager {
 
-    // MARK: - Scenario Data (mutable copies)
+    // MARK: - Core State
 
-    var baby: Baby
-    var targets: AgeTargets
-    private(set) var feeds: [FeedActivity]
-    private(set) var sleeps: [SleepActivity]
-    var currentTime: Date
+    private(set) var modelContext: ModelContext
+    private(set) var baby: Baby?
+    private(set) var allBabies: [Baby] = []
 
-    // MARK: - Nursing Timer State
+    // MARK: - Derived State
 
-    private(set) var isNursingActive: Bool = false
-    var nursingStartTime: Date?
-    var nursingEndTime: Date?
+    private(set) var snapshot: DaySnapshot?
+    private(set) var todayFeeds: [FeedEvent] = []
+    private(set) var todaySleeps: [SleepEvent] = []
 
-    // MARK: - Sleep Timer State
+    // MARK: - Active Event References
 
-    private(set) var isSleepActive: Bool = false
-    var sleepStartTime: Date?
-    var sleepEndTime: Date?
+    /// Active nursing event (persisted in SwiftData, endTime == nil)
+    private(set) var activeNursingEvent: FeedEvent?
+
+    /// Active sleep event (persisted in SwiftData, endTime == nil)
+    private(set) var activeSleepEvent: SleepEvent?
 
     // MARK: - Init
 
-    init(scenario: Scenario = .preview) {
-        self.baby = scenario.baby
-        self.targets = scenario.targets
-        self.feeds = scenario.today.feeds
-        self.sleeps = scenario.today.sleeps
-        self.currentTime = scenario.currentTime
+    init(modelContext: ModelContext) {
+        self.modelContext = modelContext
+        loadBabies()
     }
 
-    // MARK: - Nursing Timer Actions
+    // MARK: - Baby Management
 
-    func startNursing() {
-        nursingStartTime = Date()
-        nursingEndTime = nil
-        isNursingActive = true
+    func selectBaby(_ baby: Baby) {
+        self.baby = baby
+        recoverActiveEvents()
+        refresh()
+    }
+
+    @discardableResult
+    func addBaby(
+        name: String,
+        birthdate: Date,
+        bedtimeHour: Int = 19,
+        bedtimeMinute: Int = 0,
+        dreamFeedEnabled: Bool = false,
+        dreamFeedHour: Int = 22,
+        dreamFeedMinute: Int = 0
+    ) -> Baby {
+        let baby = Baby(
+            name: name,
+            birthdate: birthdate,
+            bedtimeHour: bedtimeHour,
+            bedtimeMinute: bedtimeMinute,
+            dreamFeedEnabled: dreamFeedEnabled,
+            dreamFeedHour: dreamFeedHour,
+            dreamFeedMinute: dreamFeedMinute
+        )
+        modelContext.insert(baby)
+        save()
+        loadBabies()
+        return baby
+    }
+
+    func deleteBaby(_ baby: Baby) {
+        let wasSelected = self.baby?.stableID == baby.stableID
+        modelContext.delete(baby)
+        save()
+        loadBabies()
+        if wasSelected {
+            self.baby = allBabies.first
+            recoverActiveEvents()
+            refresh()
+        }
+    }
+
+    // MARK: - Data Loading
+
+    func loadBabies() {
+        let descriptor = FetchDescriptor<Baby>(sortBy: [SortDescriptor(\.createdAt)])
+        allBabies = (try? modelContext.fetch(descriptor)) ?? []
+    }
+
+    func refresh() {
+        loadTodayEvents()
+        computeSnapshot()
+    }
+
+    private func loadTodayEvents() {
+        guard let baby else {
+            todayFeeds = []
+            todaySleeps = []
+            return
+        }
+
+        let startOfDay = Calendar.current.startOfDay(for: Date())
+
+        let allFeeds = baby.feedEvents ?? []
+        todayFeeds = allFeeds
+            .filter { $0.startTime >= startOfDay }
+            .sorted { $0.startTime < $1.startTime }
+
+        let allSleeps = baby.sleepEvents ?? []
+        todaySleeps = allSleeps
+            .filter { $0.startTime >= startOfDay }
+            .sorted { $0.startTime < $1.startTime }
+    }
+
+    private func computeSnapshot() {
+        guard let baby else {
+            snapshot = nil
+            return
+        }
+        snapshot = DayEngine.snapshot(
+            baby: baby,
+            feeds: todayFeeds,
+            sleeps: todaySleeps,
+            now: Date()
+        )
+    }
+
+    /// Recover in-progress events after app launch or baby switch
+    private func recoverActiveEvents() {
+        guard let baby else {
+            activeNursingEvent = nil
+            activeSleepEvent = nil
+            return
+        }
+
+        let feeds = baby.feedEvents ?? []
+        activeNursingEvent = feeds.first { $0.kind == .nursing && $0.isActive }
+
+        let sleeps = baby.sleepEvents ?? []
+        activeSleepEvent = sleeps.first { $0.isActive }
+    }
+
+    // MARK: - Nursing Actions
+
+    func startNursing(side: NursingSide = .both) {
+        guard let baby else { return }
+        let event = FeedEvent(
+            startTime: Date(),
+            kind: .nursing,
+            side: side,
+            baby: baby
+        )
+        modelContext.insert(event)
+        save()
+        activeNursingEvent = event
+        refresh()
     }
 
     func stopNursing() {
-        nursingEndTime = Date()
-        isNursingActive = false
+        guard let event = activeNursingEvent, event.isActive else { return }
+        event.endTime = Date()
+        save()
+        refresh()
     }
 
     func resetNursing() {
-        nursingStartTime = nil
-        nursingEndTime = nil
-        isNursingActive = false
+        if let event = activeNursingEvent {
+            modelContext.delete(event)
+            save()
+        }
+        activeNursingEvent = nil
+        refresh()
     }
 
     func saveNursing() {
-        guard let start = nursingStartTime else { return }
-        let end = nursingEndTime ?? Date()
-        let durationMinutes = max(1, Int(end.timeIntervalSince(start) / 60))
-
-        let feed = FeedActivity(
-            id: UUID(),
-            startTime: start,
-            type: .nursing(side: .both, durationMinutes: durationMinutes)
-        )
-        feeds.append(feed)
-        currentTime = Date()
-        resetNursing()
+        guard let event = activeNursingEvent else { return }
+        if event.isActive {
+            event.endTime = Date()
+        }
+        save()                  // always persist, even if already stopped
+        activeNursingEvent = nil
+        refresh()
     }
 
     // MARK: - Bottle Actions
 
-    func saveBottle(amountOz: Double) {
-        let feed = FeedActivity(
-            id: UUID(),
-            startTime: Date(),
-            type: .bottle(source: .formula, amountOz: amountOz)
+    func saveBottle(amountOz: Double, source: BottleSource = .breastMilk, at time: Date = Date()) {
+        guard let baby else { return }
+        let event = FeedEvent(
+            startTime: time,
+            endTime: time,
+            kind: .bottle,
+            source: source,
+            amountOz: amountOz,
+            baby: baby
         )
-        feeds.append(feed)
-        currentTime = Date()
+        modelContext.insert(event)
+        save()
+        refresh()
     }
 
-    // MARK: - Sleep Timer Actions
+    // MARK: - Sleep Actions
 
-    func startSleep() {
-        sleepStartTime = Date()
-        sleepEndTime = nil
-        isSleepActive = true
+    func startSleep(at startTime: Date? = nil) {
+        guard let baby else { return }
+        let event = SleepEvent(startTime: startTime ?? Date(), baby: baby)
+        modelContext.insert(event)
+        save()
+        activeSleepEvent = event
+        refresh()
+    }
+
+    func resumeSleep() {
+        guard let event = activeSleepEvent else { return }
+        event.endTime = nil
+        save()
+        refresh()
     }
 
     func stopSleep() {
-        sleepEndTime = Date()
-        isSleepActive = false
+        guard let event = activeSleepEvent, event.isActive else { return }
+        event.endTime = Date()
+        save()
+        refresh()
     }
 
     func resetSleep() {
-        sleepStartTime = nil
-        sleepEndTime = nil
-        isSleepActive = false
+        if let event = activeSleepEvent {
+            modelContext.delete(event)
+            save()
+        }
+        activeSleepEvent = nil
+        refresh()
     }
 
     func saveSleep() {
-        guard let start = sleepStartTime else { return }
-        let end = sleepEndTime ?? Date()
-
-        let sleep = SleepActivity(
-            id: UUID(),
-            startTime: start,
-            endTime: end
-        )
-        sleeps.append(sleep)
-        currentTime = Date()
-        resetSleep()
+        guard let event = activeSleepEvent else { return }
+        if event.isActive {
+            event.endTime = Date()
+        }
+        save()                  // always persist, even if already stopped
+        activeSleepEvent = nil
+        refresh()
     }
 
-    // MARK: - Sleep Display Helpers
+    func saveSleepManual(startTime: Date, endTime: Date) {
+        guard let baby else { return }
+        let event = SleepEvent(startTime: startTime, endTime: endTime, baby: baby)
+        modelContext.insert(event)
+        save()
+        activeSleepEvent = nil
+        refresh()
+    }
 
-    var sleepElapsedSeconds: TimeInterval {
-        guard let start = sleepStartTime else { return 0 }
-        if let end = sleepEndTime {
-            return end.timeIntervalSince(start)
-        }
-        return Date().timeIntervalSince(start)
+    // MARK: - Persistence
+
+    private func save() {
+        try? modelContext.save()
+    }
+
+    // MARK: - Nursing State (API compatibility with sheet views)
+
+    var isNursingActive: Bool {
+        activeNursingEvent != nil && activeNursingEvent?.endTime == nil
+    }
+
+    var hasNursingSession: Bool {
+        activeNursingEvent != nil
+    }
+
+    var nursingStartTime: Date? {
+        get { activeNursingEvent?.startTime }
+        set { if let v = newValue { activeNursingEvent?.startTime = v } }
+    }
+
+    var nursingEndTime: Date? {
+        get { activeNursingEvent?.endTime }
+        set { activeNursingEvent?.endTime = newValue }
+    }
+
+    // MARK: - Sleep State (API compatibility with sheet views)
+
+    var isSleepActive: Bool {
+        activeSleepEvent != nil && activeSleepEvent?.endTime == nil
     }
 
     var hasSleepSession: Bool {
-        sleepStartTime != nil
+        activeSleepEvent != nil
+    }
+
+    var sleepStartTime: Date? {
+        get { activeSleepEvent?.startTime }
+        set { if let v = newValue { activeSleepEvent?.startTime = v } }
+    }
+
+    var sleepEndTime: Date? {
+        get { activeSleepEvent?.endTime }
+        set { activeSleepEvent?.endTime = newValue }
+    }
+
+    // MARK: - Timer Display Helpers
+
+    func nursingTimerString(at date: Date = Date()) -> String {
+        guard let start = nursingStartTime else { return "00:00" }
+
+        let reference: Date
+        if isNursingActive {
+            reference = date              // live ticking
+        } else if let end = nursingEndTime {
+            reference = end               // static stopped duration
+        } else {
+            return "00:00"                // no valid state
+        }
+
+        let elapsed = max(0, reference.timeIntervalSince(start))
+        let minutes = Int(elapsed) / 60
+        let seconds = Int(elapsed) % 60
+        return String(format: "%02d:%02d", minutes, seconds)
     }
 
     func sleepTimerString(at date: Date = Date()) -> String {
         guard let start = sleepStartTime else { return "00:00" }
-        let reference = sleepEndTime ?? date
-        let elapsed = max(0, reference.timeIntervalSince(start))
-        let minutes = Int(elapsed) / 60
-        let seconds = Int(elapsed) % 60
-        return String(format: "%02d:%02d", minutes, seconds)
-    }
 
-    // MARK: - Nursing Display Helpers
-
-    /// Elapsed seconds since nursing started (for live timer display)
-    var nursingElapsedSeconds: TimeInterval {
-        guard let start = nursingStartTime else { return 0 }
-        if let end = nursingEndTime {
-            return end.timeIntervalSince(start)
+        let reference: Date
+        if isSleepActive {
+            reference = date
+        } else if let end = sleepEndTime {
+            reference = end
+        } else {
+            return "00:00"
         }
-        return Date().timeIntervalSince(start)
-    }
 
-    /// Whether the timer has been started (active or stopped but not reset/saved)
-    var hasNursingSession: Bool {
-        nursingStartTime != nil
-    }
-
-    /// Formatted elapsed time "MM:SS"
-    func nursingTimerString(at date: Date = Date()) -> String {
-        guard let start = nursingStartTime else { return "00:00" }
-        let reference = nursingEndTime ?? date
         let elapsed = max(0, reference.timeIntervalSince(start))
         let minutes = Int(elapsed) / 60
         let seconds = Int(elapsed) % 60
         return String(format: "%02d:%02d", minutes, seconds)
     }
 
-    // MARK: - Computed Helpers (mirror Scenario extension)
+    // MARK: - Formatted Display Helpers
 
-    var lastFeed: FeedActivity? {
-        feeds.max(by: { $0.startTime < $1.startTime })
+    var dateDisplayString: String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "EEEE, MMMM d"
+        return formatter.string(from: Date())
     }
 
-    var lastSleep: SleepActivity? {
-        sleeps.max(by: { $0.endTime < $1.endTime })
+    var ageDisplayString: String {
+        baby?.ageDescription ?? ""
+    }
+
+    var babyName: String {
+        baby?.name ?? ""
+    }
+
+    var feedCount: Int { todayFeeds.count }
+    var napCount: Int { todaySleeps.filter({ $0.endTime != nil }).count }
+
+    var totalIntakeOz: Double {
+        guard let baby else { return 0 }
+        let table = AgeTable.forAge(days: baby.ageInDays)
+        return todayFeeds.reduce(0) { $0 + $1.estimatedOz(nursingOzPerMinute: table.nursingOzPerMinute) }
+    }
+
+    var totalSleepMinutes: Int {
+        todaySleeps.compactMap(\.durationMinutes).reduce(0, +)
+    }
+
+    var longestSleepMinutes: Int {
+        todaySleeps.compactMap(\.durationMinutes).max() ?? 0
+    }
+
+    // MARK: - Feed Recommendation Helpers
+
+    var lastFeed: FeedEvent? {
+        todayFeeds.last
+    }
+
+    var lastSleep: SleepEvent? {
+        todaySleeps.filter({ $0.endTime != nil }).last
     }
 
     var minutesSinceLastFeed: Int? {
         guard let feed = lastFeed else { return nil }
-        return Int(currentTime.timeIntervalSince(feed.startTime) / 60)
+        return Int(Date().timeIntervalSince(feed.startTime) / 60)
     }
 
     var minutesSinceLastWake: Int? {
-        guard let sleep = lastSleep else { return nil }
-        return Int(currentTime.timeIntervalSince(sleep.endTime) / 60)
+        guard let sleep = lastSleep, let endTime = sleep.endTime else { return nil }
+        return Int(Date().timeIntervalSince(endTime) / 60)
     }
 
-    var feedCount: Int { feeds.count }
-    var napCount: Int { sleeps.count }
+    var totalDailyFeeds: Int { 7 }
 
-    var totalIntakeOz: Double {
-        feeds.reduce(0) { total, feed in
-            total + feed.type.estimatedOz(for: baby.ageBracket)
-        }
+    var remainingFeeds: Int {
+        max(1, totalDailyFeeds - feedCount)
     }
 
-    var totalSleepMinutes: Int {
-        sleeps.reduce(0) { $0 + $1.durationMinutes }
+    var remainingOz: Double {
+        guard let baby else { return 0 }
+        let table = AgeTable.forAge(days: baby.ageInDays)
+        let midpoint = Double(table.dailyIntakeOz.lowerBound + table.dailyIntakeOz.upperBound) / 2
+        return max(0, midpoint - totalIntakeOz)
     }
 
-    var longestSleepMinutes: Int {
-        sleeps.map(\.durationMinutes).max() ?? 0
+    var offerAmountOz: Int {
+        let amount = remainingOz / Double(remainingFeeds)
+        return max(1, Int(amount.rounded()))
     }
 
-    // MARK: - Formatted Strings
+    var nextFeedTimeFormatted: String {
+        guard let feed = lastFeed, let baby else { return "--" }
+        let table = AgeTable.forAge(days: baby.ageInDays)
+        let midpoint = Double(table.feedIntervalMinutes.lowerBound + table.feedIntervalMinutes.upperBound) / 2
+        let nextTime = feed.startTime.addingTimeInterval(midpoint * 60)
+        return nextTime.shortTime
+    }
+
+    var lastFeedOzFormatted: String {
+        guard let feed = lastFeed else { return "--" }
+        return feed.shortDescription
+    }
+
+    var timeSinceLastFeedDuration: String {
+        guard let mins = minutesSinceLastFeed else { return "--" }
+        let hours = mins / 60
+        let minutes = mins % 60
+        return hours > 0 ? "\(hours)h \(minutes)m" : "\(minutes)m"
+    }
 
     var wakeWindowFormatted: String {
         guard let mins = minutesSinceLastWake else { return "--" }
@@ -216,7 +440,7 @@ final class ActivityManager {
     }
 
     var lastSleepTimeFormatted: String {
-        lastSleep?.endTime.shortTime ?? "--"
+        lastSleep?.endTime?.shortTime ?? "--"
     }
 
     var lastSleepDurationFormatted: String {
@@ -245,60 +469,5 @@ final class ActivityManager {
         guard feedCount > 0 else { return "--" }
         let avg = totalIntakeOz / Double(feedCount)
         return String(format: "%.1f oz", avg)
-    }
-
-    var dateDisplayString: String {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "EEEE, MMMM d"
-        return formatter.string(from: currentTime)
-    }
-
-    var ageDisplayString: String {
-        let days = Calendar.current.dateComponents([.day], from: baby.birthdate, to: currentTime).day ?? 0
-        let months = days / 30
-        if months > 0 {
-            return "\(months) month\(months == 1 ? "" : "s") old"
-        }
-        return "\(days) day\(days == 1 ? "" : "s") old"
-    }
-
-    // Feed recommendation helpers
-
-    var totalDailyFeeds: Int { 7 }
-
-    var remainingFeeds: Int {
-        max(1, totalDailyFeeds - feedCount)
-    }
-
-    var remainingOz: Double {
-        let midpoint = Double(targets.dailyIntakeOz.lowerBound + targets.dailyIntakeOz.upperBound) / 2
-        return max(0, midpoint - totalIntakeOz)
-    }
-
-    var offerAmountOz: Int {
-        let amount = remainingOz / Double(remainingFeeds)
-        return max(1, Int(amount.rounded()))
-    }
-
-    var nextFeedTimeFormatted: String {
-        guard let feed = lastFeed else { return "--" }
-        let midpointInterval = Double(targets.feedIntervalMinutes.lowerBound + targets.feedIntervalMinutes.upperBound) / 2
-        let nextTime = feed.startTime.addingTimeInterval(midpointInterval * 60)
-        return nextTime.shortTime
-    }
-
-    var lastFeedOzFormatted: String {
-        guard let feed = lastFeed else { return "--" }
-        switch feed.type {
-        case .bottle(_, let oz): return "\(Int(oz)) oz"
-        case .nursing(_, let mins): return "\(mins) min"
-        }
-    }
-
-    var timeSinceLastFeedDuration: String {
-        guard let mins = minutesSinceLastFeed else { return "--" }
-        let hours = mins / 60
-        let minutes = mins % 60
-        return hours > 0 ? "\(hours)h \(minutes)m" : "\(minutes)m"
     }
 }

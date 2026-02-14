@@ -2,12 +2,15 @@
 //  Activity.swift
 //  BabyTime
 //
+//  Legacy models — used by current UI until Session 2 migration.
+//  New code should use Baby, FeedEvent, SleepEvent (SwiftData models).
+//
 
 import Foundation
 
-// MARK: - Baby
+// MARK: - Legacy Baby (used by ActivityManager + views until migration)
 
-struct Baby: Identifiable {
+struct LegacyBaby: Identifiable {
     let id: UUID
     let name: String
     let birthdate: Date
@@ -30,22 +33,22 @@ struct Baby: Identifiable {
     }
 }
 
-// MARK: - Feed Types
+// MARK: - Legacy Feed Types
 
-enum BottleSource: String, CaseIterable {
+enum LegacyBottleSource: String, CaseIterable {
     case breastMilk = "Breast milk"
     case formula = "Formula"
 }
 
-enum NursingSide: String, CaseIterable {
+enum LegacyNursingSide: String, CaseIterable {
     case left = "Left"
     case right = "Right"
     case both = "Both"
 }
 
 enum FeedType {
-    case bottle(source: BottleSource, amountOz: Double)
-    case nursing(side: NursingSide, durationMinutes: Int)
+    case bottle(source: LegacyBottleSource, amountOz: Double)
+    case nursing(side: LegacyNursingSide, durationMinutes: Int)
 
     var displayDescription: String {
         switch self {
@@ -92,7 +95,7 @@ enum FeedType {
     }
 }
 
-// MARK: - Activities
+// MARK: - Legacy Activities
 
 struct FeedActivity: Identifiable {
     let id: UUID
@@ -161,7 +164,7 @@ enum Activity: Identifiable {
     }
 }
 
-// MARK: - Age Bracket
+// MARK: - Age Bracket (legacy — replaced by AgeTable in Engine/)
 
 enum AgeBracket: String, CaseIterable {
     case newborn   // 0-1 month
@@ -240,7 +243,7 @@ struct DayLog {
 // MARK: - Scenario (for previews and testing)
 
 struct Scenario {
-    let baby: Baby
+    let baby: LegacyBaby
     let currentTime: Date
     let today: DayLog
     let targets: AgeTargets

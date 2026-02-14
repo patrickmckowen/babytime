@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import SwiftData
 
 struct FeedCard: View {
     let mode: Mode
@@ -116,10 +117,14 @@ struct FeedCard: View {
 }
 
 #Preview("Nursing Active") {
+    let container = try! ModelContainer(
+        for: Baby.self, FeedEvent.self, SleepEvent.self,
+        configurations: ModelConfiguration(isStoredInMemoryOnly: true)
+    )
     ZStack {
         Color.btBackground.ignoresSafeArea()
         FeedCard(mode: .nursingActive)
             .padding(.horizontal, BTSpacing.pageMargin)
     }
-    .environment(ActivityManager())
+    .environment(ActivityManager(modelContext: container.mainContext))
 }

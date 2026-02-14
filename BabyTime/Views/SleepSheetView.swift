@@ -3,13 +3,45 @@
 //  BabyTime
 //
 //  Sleep session sheet: start/stop timer, editable times, save/reset.
+//  Supports both live timer and manual past-sleep logging.
+//  Timer persists immediately to SwiftData for multi-device sync.
 //
 
 import SwiftUI
+import SwiftData
 
 struct SleepSheetView: View {
     @Environment(ActivityManager.self) private var activityManager
     @Environment(\.dismiss) private var dismiss
+
+    // Draft times for manual entry (before any SwiftData event exists)
+    @State private var draftStartTime: Date?
+    @State private var draftEndTime: Date?
+
+    // Cooldown: suppresses timer toggle briefly after a DatePicker tap
+    @State private var pickerInteractionDate: Date?
+
+    // Effective times: event takes precedence over draft
+    private var effectiveStartTime: Date? {
+        activityManager.sleepStartTime ?? draftStartTime
+    }
+
+    private var effectiveEndTime: Date? {
+        activityManager.sleepEndTime ?? draftEndTime
+    }
+
+    private var canSave: Bool {
+        activityManager.hasSleepSession || (draftStartTime != nil && draftEndTime != nil)
+    }
+
+    private var canReset: Bool {
+        activityManager.hasSleepSession || draftStartTime != nil || draftEndTime != nil
+    }
+
+    private var isPickerRecentlyActive: Bool {
+        guard let d = pickerInteractionDate else { return false }
+        return Date().timeIntervalSince(d) < 0.5
+    }
 
     var body: some View {
         NavigationStack {
@@ -23,6 +55,7 @@ struct SleepSheetView: View {
                 .frame(maxWidth: .infinity)
                 .contentShape(Rectangle())
                 .onTapGesture {
+                    guard !isPickerRecentlyActive else { return }
                     toggleTimer()
                 }
 
@@ -55,21 +88,43 @@ struct SleepSheetView: View {
 
     private func toggleTimer() {
         if activityManager.isSleepActive {
+            // Running → Stop
             activityManager.stopSleep()
+        } else if activityManager.hasSleepSession {
+            // Stopped → Resume (clear endTime, timer resumes)
+            activityManager.resumeSleep()
         } else {
-            if activityManager.hasSleepSession && !activityManager.isSleepActive {
-                activityManager.resetSleep()
-            }
-            activityManager.startSleep()
+            // Not started → Start (preserve manual start time if set)
+            activityManager.startSleep(at: draftStartTime)
+            draftStartTime = nil
+            draftEndTime = nil
         }
     }
 
     // MARK: - Timer Display
 
+    private func durationString(at date: Date) -> String {
+        guard let start = effectiveStartTime else { return "00:00" }
+
+        let reference: Date
+        if activityManager.isSleepActive {
+            reference = date                      // live ticking
+        } else if let end = effectiveEndTime {
+            reference = end                       // static stopped/draft duration
+        } else {
+            return "00:00"                        // draft start only → no duration yet
+        }
+
+        let elapsed = max(0, reference.timeIntervalSince(start))
+        let minutes = Int(elapsed) / 60
+        let seconds = Int(elapsed) % 60
+        return String(format: "%02d:%02d", minutes, seconds)
+    }
+
     private var timerDisplay: some View {
         VStack(spacing: 8) {
             SwiftUI.TimelineView(.periodic(from: .now, by: 1)) { context in
-                Text(activityManager.sleepTimerString(at: context.date))
+                Text(durationString(at: context.date))
                     .font(.system(size: 64, weight: .regular, design: .default))
                     .monospacedDigit()
                     .tracking(-2)
@@ -85,6 +140,8 @@ struct SleepSheetView: View {
     private var timerHintText: String {
         if activityManager.isSleepActive {
             return "Tap to stop"
+        } else if activityManager.hasSleepSession {
+            return "Tap to resume"
         } else {
             return "Tap to start"
         }
@@ -94,8 +151,6 @@ struct SleepSheetView: View {
 
     @ViewBuilder
     private var timesList: some View {
-        @Bindable var manager = activityManager
-
         VStack(spacing: 0) {
             // Start time row
             HStack {
@@ -106,30 +161,14 @@ struct SleepSheetView: View {
 
                 Spacer()
 
-                HStack(spacing: 12) {
-                    Menu {
-                        Button("Today") { updateStartDay(to: "Today") }
-                        Button("Yesterday") { updateStartDay(to: "Yesterday") }
-                    } label: {
-                        Text(startDateLabel)
-                            .font(.body)
-                            .foregroundStyle(Color(.label))
-                            .padding(.horizontal, 12)
-                            .frame(height: 32)
-                            .background(Color(.tertiarySystemFill))
-                            .clipShape(Capsule())
-                    }
-
-                    DatePicker(
-                        "",
-                        selection: Binding(
-                            get: { manager.sleepStartTime ?? Date() },
-                            set: { manager.sleepStartTime = $0 }
-                        ),
-                        displayedComponents: [.hourAndMinute]
-                    )
-                    .labelsHidden()
-                }
+                DatePicker(
+                    "",
+                    selection: startTimeBinding,
+                    in: ...Date(),
+                    displayedComponents: [.hourAndMinute]
+                )
+                .labelsHidden()
+                .simultaneousGesture(TapGesture().onEnded { pickerInteractionDate = Date() })
             }
             .padding(.vertical, 14)
 
@@ -145,27 +184,27 @@ struct SleepSheetView: View {
 
                 Spacer()
 
-                let hasEnd = manager.sleepEndTime != nil
-
                 DatePicker(
                     "",
-                    selection: Binding(
-                        get: { manager.sleepEndTime ?? Date() },
-                        set: { manager.sleepEndTime = $0 }
-                    ),
+                    selection: endTimeBinding,
+                    in: ...Date(),
                     displayedComponents: [.hourAndMinute]
                 )
                 .labelsHidden()
-                .disabled(!hasEnd || activityManager.isSleepActive)
-                .opacity(hasEnd ? (activityManager.isSleepActive ? 0.5 : 1.0) : 0.0)
+                .disabled(activityManager.isSleepActive)
+                .opacity(activityManager.isSleepActive ? 0.0 : 1.0)
                 .overlay {
-                    if !hasEnd {
+                    if activityManager.isSleepActive {
                         Text("—")
                             .font(.subheadline.weight(.medium))
                             .foregroundStyle(Color.btTextSecondary.opacity(0.4))
                             .frame(maxWidth: .infinity, alignment: .trailing)
                     }
                 }
+                .simultaneousGesture(TapGesture().onEnded {
+                    guard !activityManager.isSleepActive else { return }
+                    pickerInteractionDate = Date()
+                })
             }
             .padding(.vertical, 14)
         }
@@ -176,36 +215,32 @@ struct SleepSheetView: View {
         .padding(.vertical, 4)
     }
 
-    // MARK: - Date Labels
+    // MARK: - Time Bindings
 
-    private var startDateLabel: String {
-        guard let date = activityManager.sleepStartTime else { return "Today" }
-        if Calendar.current.isDateInYesterday(date) { return "Yesterday" }
-        return "Today"
+    private var startTimeBinding: Binding<Date> {
+        Binding(
+            get: { effectiveStartTime ?? Date() },
+            set: { newValue in
+                if activityManager.hasSleepSession {
+                    activityManager.sleepStartTime = newValue
+                } else {
+                    draftStartTime = newValue
+                }
+            }
+        )
     }
 
-    // MARK: - Day Selection
-
-    private func updateStartDay(to day: String) {
-        guard let current = activityManager.sleepStartTime else { return }
-        activityManager.sleepStartTime = shiftDate(current, toDay: day)
-    }
-
-    private func shiftDate(_ date: Date, toDay day: String) -> Date {
-        let calendar = Calendar.current
-        let time = calendar.dateComponents([.hour, .minute, .second], from: date)
-
-        let targetDay: Date = if day == "Yesterday" {
-            calendar.date(byAdding: .day, value: -1, to: calendar.startOfDay(for: Date()))!
-        } else {
-            calendar.startOfDay(for: Date())
-        }
-
-        var merged = calendar.dateComponents([.year, .month, .day], from: targetDay)
-        merged.hour = time.hour
-        merged.minute = time.minute
-        merged.second = time.second
-        return calendar.date(from: merged) ?? date
+    private var endTimeBinding: Binding<Date> {
+        Binding(
+            get: { effectiveEndTime ?? Date() },
+            set: { newValue in
+                if activityManager.hasSleepSession {
+                    activityManager.sleepEndTime = newValue
+                } else {
+                    draftEndTime = newValue
+                }
+            }
+        )
     }
 
     // MARK: - Action Buttons
@@ -214,6 +249,8 @@ struct SleepSheetView: View {
         HStack(spacing: 14) {
             Button {
                 activityManager.resetSleep()
+                draftStartTime = nil
+                draftEndTime = nil
             } label: {
                 Text("Reset")
                     .font(BTTypography.label)
@@ -225,10 +262,14 @@ struct SleepSheetView: View {
                     .clipShape(Capsule())
                     .cardShadow()
             }
-            .disabled(!activityManager.hasSleepSession)
+            .disabled(!canReset)
 
             Button {
-                activityManager.saveSleep()
+                if activityManager.hasSleepSession {
+                    activityManager.saveSleep()
+                } else if let start = draftStartTime, let end = draftEndTime {
+                    activityManager.saveSleepManual(startTime: start, endTime: end)
+                }
                 dismiss()
             } label: {
                 Text("Save")
@@ -241,12 +282,16 @@ struct SleepSheetView: View {
                     .clipShape(Capsule())
                     .cardShadow()
             }
-            .disabled(!activityManager.hasSleepSession)
+            .disabled(!canSave)
         }
     }
 }
 
 #Preview {
+    let container = try! ModelContainer(
+        for: Baby.self, FeedEvent.self, SleepEvent.self,
+        configurations: ModelConfiguration(isStoredInMemoryOnly: true)
+    )
     SleepSheetView()
-        .environment(ActivityManager())
+        .environment(ActivityManager(modelContext: container.mainContext))
 }

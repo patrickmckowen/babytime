@@ -3,13 +3,23 @@
 //  BabyTime
 //
 //  Nursing session sheet: start/stop timer, editable times, save/reset.
+//  Timer persists immediately to SwiftData for multi-device sync.
 //
 
 import SwiftUI
+import SwiftData
 
 struct NursingSheetView: View {
     @Environment(ActivityManager.self) private var activityManager
     @Environment(\.dismiss) private var dismiss
+
+    // Cooldown: suppresses timer toggle briefly after a DatePicker tap
+    @State private var pickerInteractionDate: Date?
+
+    private var isPickerRecentlyActive: Bool {
+        guard let d = pickerInteractionDate else { return false }
+        return Date().timeIntervalSince(d) < 0.5
+    }
 
     var body: some View {
         NavigationStack {
@@ -23,6 +33,7 @@ struct NursingSheetView: View {
                 .frame(maxWidth: .infinity)
                 .contentShape(Rectangle())
                 .onTapGesture {
+                    guard !isPickerRecentlyActive else { return }
                     toggleTimer()
                 }
 
@@ -56,12 +67,11 @@ struct NursingSheetView: View {
     private func toggleTimer() {
         if activityManager.isNursingActive {
             activityManager.stopNursing()
+        } else if activityManager.hasNursingSession {
+            // Session exists but stopped — reset and start new
+            activityManager.resetNursing()
+            activityManager.startNursing()
         } else {
-            // Start or restart
-            if activityManager.hasNursingSession && !activityManager.isNursingActive {
-                // Reset and start new session
-                activityManager.resetNursing()
-            }
             activityManager.startNursing()
         }
     }
@@ -130,9 +140,11 @@ struct NursingSheetView: View {
                             get: { manager.nursingStartTime ?? Date() },
                             set: { manager.nursingStartTime = $0 }
                         ),
+                        in: ...Date(),
                         displayedComponents: [.hourAndMinute]
                     )
                     .labelsHidden()
+                    .simultaneousGesture(TapGesture().onEnded { pickerInteractionDate = Date() })
                 }
             }
             .padding(.vertical, 14)
@@ -157,10 +169,15 @@ struct NursingSheetView: View {
                         get: { manager.nursingEndTime ?? Date() },
                         set: { manager.nursingEndTime = $0 }
                     ),
+                    in: ...Date(),
                     displayedComponents: [.hourAndMinute]
                 )
                 .labelsHidden()
                 .disabled(!hasEnd || activityManager.isNursingActive)
+                .simultaneousGesture(TapGesture().onEnded {
+                    guard !activityManager.isNursingActive else { return }
+                    pickerInteractionDate = Date()
+                })
                 .opacity(hasEnd ? (activityManager.isNursingActive ? 0.5 : 1.0) : 0.0)
                 .overlay {
                     if !hasEnd {
@@ -249,6 +266,10 @@ struct NursingSheetView: View {
 }
 
 #Preview {
+    let container = try! ModelContainer(
+        for: Baby.self, FeedEvent.self, SleepEvent.self,
+        configurations: ModelConfiguration(isStoredInMemoryOnly: true)
+    )
     NursingSheetView()
-        .environment(ActivityManager())
+        .environment(ActivityManager(modelContext: container.mainContext))
 }

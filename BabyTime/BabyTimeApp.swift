@@ -33,6 +33,7 @@ struct BabyTimeApp: App {
             ContentView()
                 .environment(activityManager)
                 .modelContainer(container)
+                .preferredColorScheme(.light)
         }
     }
 }

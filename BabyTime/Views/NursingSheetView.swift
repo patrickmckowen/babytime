@@ -3,6 +3,7 @@
 //  BabyTime
 //
 //  Nursing session sheet: start/stop timer, editable times, save/reset.
+//  Supports both live timer and manual past-nursing logging.
 //  Timer persists immediately to SwiftData for multi-device sync.
 //
 
@@ -13,8 +14,29 @@ struct NursingSheetView: View {
     @Environment(ActivityManager.self) private var activityManager
     @Environment(\.dismiss) private var dismiss
 
+    // Draft times for manual entry (before any SwiftData event exists)
+    @State private var draftStartTime: Date?
+    @State private var draftEndTime: Date?
+
     // Cooldown: suppresses timer toggle briefly after a DatePicker tap
     @State private var pickerInteractionDate: Date?
+
+    // Effective times: event takes precedence over draft
+    private var effectiveStartTime: Date? {
+        activityManager.nursingStartTime ?? draftStartTime
+    }
+
+    private var effectiveEndTime: Date? {
+        activityManager.nursingEndTime ?? draftEndTime
+    }
+
+    private var canSave: Bool {
+        activityManager.hasNursingSession || (draftStartTime != nil && draftEndTime != nil)
+    }
+
+    private var canReset: Bool {
+        activityManager.hasNursingSession || draftStartTime != nil || draftEndTime != nil
+    }
 
     private var isPickerRecentlyActive: Bool {
         guard let d = pickerInteractionDate else { return false }
@@ -68,20 +90,38 @@ struct NursingSheetView: View {
         if activityManager.isNursingActive {
             activityManager.stopNursing()
         } else if activityManager.hasNursingSession {
-            // Session exists but stopped — reset and start new
-            activityManager.resetNursing()
-            activityManager.startNursing()
+            activityManager.resumeNursing()
         } else {
-            activityManager.startNursing()
+            activityManager.startNursing(at: draftStartTime)
+            draftStartTime = nil
+            draftEndTime = nil
         }
     }
 
     // MARK: - Timer Display
 
+    private func durationString(at date: Date) -> String {
+        guard let start = effectiveStartTime else { return "00:00" }
+
+        let reference: Date
+        if activityManager.isNursingActive {
+            reference = date                      // live ticking
+        } else if let end = effectiveEndTime {
+            reference = end                       // static stopped/draft duration
+        } else {
+            return "00:00"                        // draft start only → no duration yet
+        }
+
+        let elapsed = max(0, reference.timeIntervalSince(start))
+        let minutes = Int(elapsed) / 60
+        let seconds = Int(elapsed) % 60
+        return String(format: "%02d:%02d", minutes, seconds)
+    }
+
     private var timerDisplay: some View {
         VStack(spacing: 8) {
             SwiftUI.TimelineView(.periodic(from: .now, by: 1)) { context in
-                Text(activityManager.nursingTimerString(at: context.date))
+                Text(durationString(at: context.date))
                     .font(.system(size: 64, weight: .regular, design: .default))
                     .monospacedDigit()
                     .tracking(-2)
@@ -97,6 +137,8 @@ struct NursingSheetView: View {
     private var timerHintText: String {
         if activityManager.isNursingActive {
             return "Tap to stop"
+        } else if activityManager.hasNursingSession {
+            return "Tap to resume"
         } else {
             return "Tap to start"
         }
@@ -106,10 +148,8 @@ struct NursingSheetView: View {
 
     @ViewBuilder
     private var timesList: some View {
-        @Bindable var manager = activityManager
-
         VStack(spacing: 0) {
-            // Start time row - always visible
+            // Start time row
             HStack {
                 Text("Start")
                     .font(BTTypography.label)
@@ -118,41 +158,21 @@ struct NursingSheetView: View {
 
                 Spacer()
 
-                HStack(spacing: 12) {
-                    // Day select menu — Today / Yesterday
-                    Menu {
-                        Button("Today") { updateStartDay(to: "Today") }
-                        Button("Yesterday") { updateStartDay(to: "Yesterday") }
-                    } label: {
-                        Text(startDateLabel)
-                            .font(.body)
-                            .foregroundStyle(Color(.label))
-                            .padding(.horizontal, 12)
-                            .frame(height: 32)
-                            .background(Color(.tertiarySystemFill))
-                            .clipShape(Capsule())
-                    }
-
-                    // Time picker — fully native
-                    DatePicker(
-                        "",
-                        selection: Binding(
-                            get: { manager.nursingStartTime ?? Date() },
-                            set: { manager.nursingStartTime = $0 }
-                        ),
-                        in: ...Date(),
-                        displayedComponents: [.hourAndMinute]
-                    )
-                    .labelsHidden()
-                    .simultaneousGesture(TapGesture().onEnded { pickerInteractionDate = Date() })
-                }
+                DatePicker(
+                    "",
+                    selection: startTimeBinding,
+                    in: ...Date(),
+                    displayedComponents: [.hourAndMinute]
+                )
+                .labelsHidden()
+                .simultaneousGesture(TapGesture().onEnded { pickerInteractionDate = Date() })
             }
             .padding(.vertical, 14)
 
             Divider()
                 .foregroundStyle(Color.btDivider)
 
-            // End time row - always visible, disabled until stopped
+            // End time row
             HStack {
                 Text("End")
                     .font(BTTypography.label)
@@ -161,32 +181,27 @@ struct NursingSheetView: View {
 
                 Spacer()
 
-                let hasEnd = manager.nursingEndTime != nil
-
                 DatePicker(
                     "",
-                    selection: Binding(
-                        get: { manager.nursingEndTime ?? Date() },
-                        set: { manager.nursingEndTime = $0 }
-                    ),
+                    selection: endTimeBinding,
                     in: ...Date(),
                     displayedComponents: [.hourAndMinute]
                 )
                 .labelsHidden()
-                .disabled(!hasEnd || activityManager.isNursingActive)
-                .simultaneousGesture(TapGesture().onEnded {
-                    guard !activityManager.isNursingActive else { return }
-                    pickerInteractionDate = Date()
-                })
-                .opacity(hasEnd ? (activityManager.isNursingActive ? 0.5 : 1.0) : 0.0)
+                .disabled(activityManager.isNursingActive)
+                .opacity(activityManager.isNursingActive ? 0.0 : 1.0)
                 .overlay {
-                    if !hasEnd {
+                    if activityManager.isNursingActive {
                         Text("—")
                             .font(.subheadline.weight(.medium))
                             .foregroundStyle(Color.btTextSecondary.opacity(0.4))
                             .frame(maxWidth: .infinity, alignment: .trailing)
                     }
                 }
+                .simultaneousGesture(TapGesture().onEnded {
+                    guard !activityManager.isNursingActive else { return }
+                    pickerInteractionDate = Date()
+                })
             }
             .padding(.vertical, 14)
         }
@@ -197,41 +212,42 @@ struct NursingSheetView: View {
         .padding(.vertical, 4)
     }
 
-    // MARK: - Date Label
+    // MARK: - Time Bindings
 
-    private var startDateLabel: String {
-        guard let date = activityManager.nursingStartTime else { return "Today" }
-        if Calendar.current.isDateInYesterday(date) { return "Yesterday" }
-        return "Today"
+    private var startTimeBinding: Binding<Date> {
+        Binding(
+            get: { effectiveStartTime ?? Date() },
+            set: { newValue in
+                if activityManager.hasNursingSession {
+                    activityManager.nursingStartTime = newValue
+                } else {
+                    draftStartTime = newValue
+                }
+            }
+        )
     }
 
-    // MARK: - Day Selection
-
-    private func updateStartDay(to day: String) {
-        guard let current = activityManager.nursingStartTime else { return }
-        let calendar = Calendar.current
-        let time = calendar.dateComponents([.hour, .minute, .second], from: current)
-
-        let targetDay: Date = if day == "Yesterday" {
-            calendar.date(byAdding: .day, value: -1, to: calendar.startOfDay(for: Date()))!
-        } else {
-            calendar.startOfDay(for: Date())
-        }
-
-        var merged = calendar.dateComponents([.year, .month, .day], from: targetDay)
-        merged.hour = time.hour
-        merged.minute = time.minute
-        merged.second = time.second
-        activityManager.nursingStartTime = calendar.date(from: merged)
+    private var endTimeBinding: Binding<Date> {
+        Binding(
+            get: { effectiveEndTime ?? Date() },
+            set: { newValue in
+                if activityManager.hasNursingSession {
+                    activityManager.nursingEndTime = newValue
+                } else {
+                    draftEndTime = newValue
+                }
+            }
+        )
     }
 
     // MARK: - Action Buttons
 
     private var actionButtons: some View {
         HStack(spacing: 14) {
-            // Reset
             Button {
                 activityManager.resetNursing()
+                draftStartTime = nil
+                draftEndTime = nil
             } label: {
                 Text("Reset")
                     .font(BTTypography.label)
@@ -243,11 +259,14 @@ struct NursingSheetView: View {
                     .clipShape(Capsule())
                     .cardShadow()
             }
-            .disabled(!activityManager.hasNursingSession)
+            .disabled(!canReset)
 
-            // Save
             Button {
-                activityManager.saveNursing()
+                if activityManager.hasNursingSession {
+                    activityManager.saveNursing()
+                } else if let start = draftStartTime, let end = draftEndTime {
+                    activityManager.saveNursingManual(startTime: start, endTime: end)
+                }
                 dismiss()
             } label: {
                 Text("Save")
@@ -260,7 +279,7 @@ struct NursingSheetView: View {
                     .clipShape(Capsule())
                     .cardShadow()
             }
-            .disabled(!activityManager.hasNursingSession)
+            .disabled(!canSave)
         }
     }
 }

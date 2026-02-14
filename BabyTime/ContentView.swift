@@ -7,6 +7,7 @@
 
 import SwiftUI
 import SwiftData
+import PhotosUI
 
 struct ContentView: View {
     @Environment(ActivityManager.self) private var activityManager
@@ -16,6 +17,8 @@ struct ContentView: View {
     @State private var showBottleSheet = false
     @State private var showSleepSheet = false
     @State private var showSettings = false
+    @State private var selectedPhoto: PhotosPickerItem?
+    @State private var showPhotoPicker = false
 
     var body: some View {
         NavigationStack {
@@ -23,7 +26,10 @@ struct ContentView: View {
                 if activityManager.baby != nil {
                     HomeView(
                         onNursingTap: { showNursingSheet = true },
-                        onSleepTap: { showSleepSheet = true }
+                        onBottleTap: { showBottleSheet = true },
+                        onSleepTap: { showSleepSheet = true },
+                        onPhotoTap: { showPhotoPicker = true },
+                        onSettingsTap: { showSettings = true }
                     )
                 } else {
                     WelcomeView()
@@ -50,14 +56,6 @@ struct ContentView: View {
                     } label: {
                         Image(systemName: "moon.zzz.fill")
                     }
-
-                    Spacer()
-
-                    Button {
-                        showSettings = true
-                    } label: {
-                        Image(systemName: "gearshape")
-                    }
                 }
             }
         }
@@ -72,6 +70,21 @@ struct ContentView: View {
         }
         .sheet(isPresented: $showSettings) {
             SettingsView()
+        }
+        .photosPicker(
+            isPresented: $showPhotoPicker,
+            selection: $selectedPhoto,
+            matching: .images
+        )
+        .onChange(of: selectedPhoto) { _, newItem in
+            guard let newItem else { return }
+            Task {
+                if let data = try? await newItem.loadTransferable(type: Data.self),
+                   let compressed = ImageUtilities.resizeForProfile(data: data) {
+                    activityManager.setBabyPhoto(compressed)
+                }
+                selectedPhoto = nil
+            }
         }
         .onAppear {
             selectBabyFromStorage()
@@ -100,7 +113,7 @@ struct ContentView: View {
 
 #Preview {
     let container = try! ModelContainer(
-        for: Baby.self, FeedEvent.self, SleepEvent.self,
+        for: Baby.self, FeedEvent.self, SleepEvent.self, WakeEvent.self,
         configurations: ModelConfiguration(isStoredInMemoryOnly: true)
     )
     ContentView()

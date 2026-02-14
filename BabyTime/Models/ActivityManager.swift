@@ -24,6 +24,7 @@ final class ActivityManager {
     private(set) var snapshot: DaySnapshot?
     private(set) var todayFeeds: [FeedEvent] = []
     private(set) var todaySleeps: [SleepEvent] = []
+    private(set) var todayWakeEvent: WakeEvent?
 
     // MARK: - Active Event References
 
@@ -56,7 +57,8 @@ final class ActivityManager {
         bedtimeMinute: Int = 0,
         dreamFeedEnabled: Bool = false,
         dreamFeedHour: Int = 22,
-        dreamFeedMinute: Int = 0
+        dreamFeedMinute: Int = 0,
+        photoData: Data? = nil
     ) -> Baby {
         let baby = Baby(
             name: name,
@@ -65,7 +67,8 @@ final class ActivityManager {
             bedtimeMinute: bedtimeMinute,
             dreamFeedEnabled: dreamFeedEnabled,
             dreamFeedHour: dreamFeedHour,
-            dreamFeedMinute: dreamFeedMinute
+            dreamFeedMinute: dreamFeedMinute,
+            photoData: photoData
         )
         modelContext.insert(baby)
         save()
@@ -101,6 +104,7 @@ final class ActivityManager {
         guard let baby else {
             todayFeeds = []
             todaySleeps = []
+            todayWakeEvent = nil
             return
         }
 
@@ -115,6 +119,9 @@ final class ActivityManager {
         todaySleeps = allSleeps
             .filter { $0.startTime >= startOfDay }
             .sorted { $0.startTime < $1.startTime }
+
+        let allWakes = baby.wakeEvents ?? []
+        todayWakeEvent = allWakes.first { $0.date == startOfDay }
     }
 
     private func computeSnapshot() {
@@ -126,6 +133,7 @@ final class ActivityManager {
             baby: baby,
             feeds: todayFeeds,
             sleeps: todaySleeps,
+            wakeTime: todayWakeEvent?.time,
             now: Date()
         )
     }
@@ -257,6 +265,32 @@ final class ActivityManager {
         refresh()
     }
 
+    // MARK: - Wake Time Actions
+
+    func setWakeTime(_ time: Date) {
+        guard let baby else { return }
+        let startOfDay = Calendar.current.startOfDay(for: Date())
+
+        if let existing = todayWakeEvent {
+            // Upsert: update existing wake event for today
+            existing.time = time
+        } else {
+            // Create new wake event
+            let event = WakeEvent(date: startOfDay, time: time, baby: baby)
+            modelContext.insert(event)
+        }
+        save()
+        refresh()
+    }
+
+    var hasWakeTime: Bool {
+        todayWakeEvent != nil
+    }
+
+    var wakeTimeFormatted: String {
+        todayWakeEvent?.time.shortTime ?? "--"
+    }
+
     // MARK: - Persistence
 
     private func save() {
@@ -349,12 +383,31 @@ final class ActivityManager {
         return formatter.string(from: Date())
     }
 
+    var shortDateDisplayString: String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "EEEE, MMM d"
+        return formatter.string(from: Date())
+    }
+
     var ageDisplayString: String {
         baby?.ageDescription ?? ""
     }
 
     var babyName: String {
         baby?.name ?? ""
+    }
+
+    var bedtimeFormatted: String? {
+        baby?.bedtimeToday().shortTime
+    }
+
+    var babyPhotoData: Data? {
+        baby?.photoData
+    }
+
+    func setBabyPhoto(_ data: Data?) {
+        baby?.photoData = data
+        save()
     }
 
     var feedCount: Int { todayFeeds.count }

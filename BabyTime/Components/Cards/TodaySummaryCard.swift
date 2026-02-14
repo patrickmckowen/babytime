@@ -8,30 +8,45 @@
 import SwiftUI
 
 struct TodaySummaryCard: View {
+    let dateString: String
+    let ageString: String
     let totalSleep: String
     let longestSleep: String
     let napCount: Int
     let totalOz: String
     let feedCount: Int
     let averageOz: String
+    var wakeTime: String? = nil
+    var bedtimeTime: String? = nil
+    var onWakeTimeChanged: ((Date) -> Void)? = nil
+
+    @State private var isEditingWakeTime = false
+    @State private var editWakeTime = Date()
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            // Header: "Today"
-            Text("Today")
-                .font(BTTypography.photoDate)
-                .tracking(BTTracking.photoDate)
-                .foregroundStyle(Color.btTextPrimary)
+            // Header: Date and age
+            VStack(alignment: .leading, spacing: 2) {
+                Text(dateString)
+                    .font(BTTypography.photoDate)
+                    .tracking(BTTracking.photoDate)
+                    .foregroundStyle(Color.btTextPrimary)
 
-            // Sleep row
-            SummaryRow(
-                iconName: "moon.fill",
-                iconColor: .btSleepAccent,
-                columns: [
-                    StatColumn(label: "Naps", value: "\(napCount)"),
-                    StatColumn(label: "Longest", value: longestSleep),
-                    StatColumn(label: "Total", value: totalSleep)
-                ]
+                Text(ageString)
+                    .font(BTTypography.photoAge)
+                    .tracking(BTTracking.photoAge)
+                    .foregroundStyle(Color.btTextSecondary)
+            }
+
+            // Wake time row (always visible)
+            WakeTimeRow(
+                wakeTime: wakeTime ?? "--",
+                isEditing: $isEditingWakeTime,
+                editTime: $editWakeTime,
+                onConfirm: {
+                    onWakeTimeChanged?(editWakeTime)
+                    isEditingWakeTime = false
+                }
             )
             .padding(.top, BTSpacing.todayHeaderToRow)
 
@@ -51,6 +66,33 @@ struct TodaySummaryCard: View {
                     StatColumn(label: "Total", value: totalOz)
                 ]
             )
+
+            // Divider
+            Rectangle()
+                .fill(Color.btDivider)
+                .frame(height: 1)
+                .padding(.vertical, BTSpacing.rowDividerPadding)
+
+            // Naps row
+            SummaryRow(
+                iconName: "moon.fill",
+                iconColor: .btSleepAccent,
+                columns: [
+                    StatColumn(label: "Naps", value: "\(napCount)"),
+                    StatColumn(label: "Longest", value: longestSleep),
+                    StatColumn(label: "Total", value: totalSleep)
+                ]
+            )
+
+            // Bedtime row
+            if let bedtimeTime {
+                Rectangle()
+                    .fill(Color.btDivider)
+                    .frame(height: 1)
+                    .padding(.vertical, BTSpacing.rowDividerPadding)
+
+                BedtimeRow(bedtime: bedtimeTime)
+            }
         }
         .padding(.top, BTSpacing.cardPaddingTop)
         .padding(.horizontal, BTSpacing.cardPaddingHorizontal)
@@ -110,18 +152,119 @@ private struct SummaryRow: View {
     }
 }
 
+// MARK: - Wake Time Row
+
+private struct WakeTimeRow: View {
+    let wakeTime: String
+    @Binding var isEditing: Bool
+    @Binding var editTime: Date
+    var onConfirm: () -> Void
+
+    var body: some View {
+        HStack(spacing: BTSpacing.iconToStat) {
+            // Icon container
+            RoundedRectangle(cornerRadius: BTRadius.iconContainer, style: .continuous)
+                .fill(Color.btSleepAccent.opacity(0.10))
+                .frame(width: BTIconSize.container, height: BTIconSize.container)
+                .overlay {
+                    Image(systemName: "sunrise.fill")
+                        .font(.system(size: 16, weight: .medium))
+                        .foregroundStyle(Color.btSleepAccent)
+                }
+
+            if isEditing {
+                DatePicker(
+                    "",
+                    selection: $editTime,
+                    displayedComponents: .hourAndMinute
+                )
+                .labelsHidden()
+
+                Spacer()
+
+                Button {
+                    onConfirm()
+                } label: {
+                    Image(systemName: "checkmark")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .frame(width: 32, height: 32)
+                        .background(Color.btSleepAccent)
+                        .clipShape(Circle())
+                }
+            } else {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Wake")
+                        .font(BTTypography.statLabel)
+                        .tracking(BTTracking.statLabel)
+                        .foregroundStyle(Color.btTextMuted)
+
+                    Text(wakeTime)
+                        .font(BTTypography.statValue)
+                        .tracking(BTTracking.statValue)
+                        .foregroundStyle(Color.btTextPrimary)
+                }
+
+                Spacer()
+            }
+        }
+        .contentShape(Rectangle())
+        .onTapGesture {
+            if !isEditing {
+                isEditing = true
+            }
+        }
+    }
+}
+
+// MARK: - Bedtime Row
+
+private struct BedtimeRow: View {
+    let bedtime: String
+
+    var body: some View {
+        HStack(spacing: BTSpacing.iconToStat) {
+            RoundedRectangle(cornerRadius: BTRadius.iconContainer, style: .continuous)
+                .fill(Color.btSleepAccent.opacity(0.10))
+                .frame(width: BTIconSize.container, height: BTIconSize.container)
+                .overlay {
+                    Image(systemName: "moon.stars.fill")
+                        .font(.system(size: 16, weight: .medium))
+                        .foregroundStyle(Color.btSleepAccent)
+                }
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Bedtime")
+                    .font(BTTypography.statLabel)
+                    .tracking(BTTracking.statLabel)
+                    .foregroundStyle(Color.btTextMuted)
+
+                Text(bedtime)
+                    .font(BTTypography.statValue)
+                    .tracking(BTTracking.statValue)
+                    .foregroundStyle(Color.btTextPrimary)
+            }
+
+            Spacer()
+        }
+    }
+}
+
 // MARK: - Preview
 
 #Preview {
     ZStack {
         Color.btBackground.ignoresSafeArea()
         TodaySummaryCard(
+            dateString: "Friday, Feb 13",
+            ageString: "3 months old",
             totalSleep: "1h 30m",
             longestSleep: "45m",
             napCount: 3,
             totalOz: "17 oz",
             feedCount: 4,
-            averageOz: "4.3 oz"
+            averageOz: "4.3 oz",
+            bedtimeTime: "7:00 PM"
         )
         .padding(.horizontal, BTSpacing.pageMargin)
     }

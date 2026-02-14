@@ -18,11 +18,11 @@ struct BabyTimeApp: App {
         if ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil {
             let config = ModelConfiguration(isStoredInMemoryOnly: true, cloudKitDatabase: .none)
             container = try! ModelContainer(
-                for: Baby.self, FeedEvent.self, SleepEvent.self,
+                for: Baby.self, FeedEvent.self, SleepEvent.self, WakeEvent.self,
                 configurations: config
             )
         } else {
-            container = try! ModelContainer(for: Baby.self, FeedEvent.self, SleepEvent.self)
+            container = try! ModelContainer(for: Baby.self, FeedEvent.self, SleepEvent.self, WakeEvent.self)
         }
         self.container = container
         self._activityManager = State(initialValue: ActivityManager(modelContext: container.mainContext))

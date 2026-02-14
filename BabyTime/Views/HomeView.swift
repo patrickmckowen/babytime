@@ -12,7 +12,10 @@ import SwiftData
 struct HomeView: View {
     @Environment(ActivityManager.self) private var activityManager
     var onNursingTap: (() -> Void)?
+    var onBottleTap: (() -> Void)?
     var onSleepTap: (() -> Void)?
+    var onPhotoTap: (() -> Void)?
+    var onSettingsTap: (() -> Void)?
 
     var body: some View {
         ScrollView {
@@ -20,8 +23,9 @@ struct HomeView: View {
                 // 1. Baby photo header (fullbleed)
                 BabyPhotoHeader(
                     babyName: activityManager.babyName,
-                    dateString: activityManager.dateDisplayString,
-                    ageString: activityManager.ageDisplayString
+                    photoData: activityManager.babyPhotoData,
+                    onPhotoTap: onPhotoTap,
+                    onSettingsTap: onSettingsTap
                 )
 
                 // Cards section
@@ -34,12 +38,19 @@ struct HomeView: View {
 
                     // 4. Today summary
                     TodaySummaryCard(
+                        dateString: activityManager.shortDateDisplayString,
+                        ageString: activityManager.ageDisplayString,
                         totalSleep: activityManager.totalSleepFormatted,
                         longestSleep: activityManager.longestSleepFormatted,
                         napCount: activityManager.napCount,
                         totalOz: activityManager.totalOzFormatted,
                         feedCount: activityManager.feedCount,
-                        averageOz: activityManager.averageOzFormatted
+                        averageOz: activityManager.averageOzFormatted,
+                        wakeTime: activityManager.hasWakeTime ? activityManager.wakeTimeFormatted : nil,
+                        bedtimeTime: activityManager.bedtimeFormatted,
+                        onWakeTimeChanged: { time in
+                            activityManager.setWakeTime(time)
+                        }
                     )
                 }
                 .padding(.top, BTSpacing.photoToCard)
@@ -59,6 +70,12 @@ struct HomeView: View {
             FeedCard(
                 mode: .nursingActive,
                 onTap: onNursingTap
+            )
+        } else if activityManager.snapshot?.feedState == .noFeedsYet {
+            FeedCard(
+                mode: .logFirstFeed,
+                onBottleTap: onBottleTap,
+                onNurseTap: onNursingTap
             )
         } else {
             FeedCard(
@@ -84,35 +101,32 @@ struct HomeView: View {
             )
         } else if let snapshot = activityManager.snapshot {
             SleepCard(
-                mode: sleepCardMode(from: snapshot.dayState),
-                onTap: nil
+                mode: sleepCardMode(from: snapshot),
+                onTap: nil,
+                onWakeTimeSubmit: { time in
+                    activityManager.setWakeTime(time)
+                }
             )
         } else {
             SleepCard(
-                mode: .awake(
-                    label: "Good morning",
-                    duration: "--",
-                    detail: "No events yet"
-                ),
-                onTap: nil
+                mode: .wakeTimePrompt(babyName: activityManager.babyName),
+                onWakeTimeSubmit: { time in
+                    activityManager.setWakeTime(time)
+                }
             )
         }
     }
 
-    private func sleepCardMode(from dayState: DayState) -> SleepCard.Mode {
-        switch dayState {
+    private func sleepCardMode(from snapshot: DaySnapshot) -> SleepCard.Mode {
+        switch snapshot.dayState {
         case .notStarted:
-            return .awake(
-                label: "Good morning",
-                duration: "--",
-                detail: "No events yet"
-            )
+            return .wakeTimePrompt(babyName: activityManager.babyName)
 
         case .awakeEarly(let mins, _):
             return .awake(
                 label: "Awake for",
                 duration: formatMinutes(mins),
-                detail: "Last slept at \(activityManager.lastSleepTimeFormatted) \u{00B7} \(activityManager.lastSleepDurationFormatted)"
+                detail: wakeDetail(snapshot: snapshot)
             )
 
         case .awakeApproaching(let mins, let range):
@@ -166,6 +180,16 @@ struct HomeView: View {
         }
     }
 
+    private func wakeDetail(snapshot: DaySnapshot) -> String {
+        if activityManager.lastSleep != nil {
+            return "Last slept at \(activityManager.lastSleepTimeFormatted) \u{00B7} \(activityManager.lastSleepDurationFormatted)"
+        } else if let wakeTime = snapshot.wakeTime {
+            return "Woke at \(wakeTime.shortTime)"
+        } else {
+            return ""
+        }
+    }
+
     private func formatMinutes(_ mins: Int) -> String {
         let hours = mins / 60
         let minutes = mins % 60
@@ -180,7 +204,7 @@ struct HomeView: View {
 
 #Preview("Home") {
     let container = try! ModelContainer(
-        for: Baby.self, FeedEvent.self, SleepEvent.self,
+        for: Baby.self, FeedEvent.self, SleepEvent.self, WakeEvent.self,
         configurations: ModelConfiguration(isStoredInMemoryOnly: true)
     )
     let manager = ActivityManager(modelContext: container.mainContext)

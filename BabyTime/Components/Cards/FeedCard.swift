@@ -11,10 +11,13 @@ import SwiftData
 struct FeedCard: View {
     let mode: Mode
     var onTap: (() -> Void)?
+    var onBottleTap: (() -> Void)?
+    var onNurseTap: (() -> Void)?
 
     enum Mode {
         case nextFeed(offerAmountOz: Int, nextFeedTime: String, lastFeedAmount: String, lastFeedAgo: String)
         case nursingActive
+        case logFirstFeed
     }
 
     var body: some View {
@@ -29,6 +32,8 @@ struct FeedCard: View {
                 )
             case .nursingActive:
                 nursingActiveContent
+            case .logFirstFeed:
+                logFirstFeedContent
             }
         }
         .padding(.top, BTSpacing.cardPaddingTop)
@@ -68,6 +73,63 @@ struct FeedCard: View {
                 .tracking(BTTracking.label)
                 .foregroundStyle(Color.btTextSecondary)
                 .padding(.top, BTSpacing.headlineToDetail)
+        }
+    }
+
+    // MARK: - Log First Feed (Empty State)
+
+    private var timeOfDayGreeting: String {
+        let hour = Calendar.current.component(.hour, from: Date())
+        if hour < 12 {
+            return "Good morning"
+        } else if hour < 17 {
+            return "Good afternoon"
+        } else {
+            return "Good evening"
+        }
+    }
+
+    private var logFirstFeedContent: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Text(timeOfDayGreeting)
+                .font(BTTypography.headlineSmall)
+                .tracking(BTTracking.headlineSmall)
+                .foregroundStyle(Color.btTextPrimary)
+
+            Text("Log the first feed")
+                .font(BTTypography.label)
+                .tracking(BTTracking.label)
+                .foregroundStyle(Color.btTextSecondary)
+                .padding(.top, BTSpacing.labelToHeadline)
+
+            HStack(spacing: 12) {
+                Button {
+                    onNurseTap?()
+                } label: {
+                    Label("Nurse", systemImage: "drop.fill")
+                        .font(BTTypography.label)
+                        .tracking(BTTracking.label)
+                        .foregroundStyle(.white)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 12)
+                        .background(Color.btFeedAccent)
+                        .clipShape(Capsule())
+                }
+
+                Button {
+                    onBottleTap?()
+                } label: {
+                    Label("Bottle", systemImage: "waterbottle.fill")
+                        .font(BTTypography.label)
+                        .tracking(BTTracking.label)
+                        .foregroundStyle(.white)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 12)
+                        .background(Color.btFeedAccent)
+                        .clipShape(Capsule())
+                }
+            }
+            .padding(.top, 18)
         }
     }
 
@@ -116,9 +178,21 @@ struct FeedCard: View {
     }
 }
 
+#Preview("Log First Feed") {
+    ZStack {
+        Color.btBackground.ignoresSafeArea()
+        FeedCard(
+            mode: .logFirstFeed,
+            onBottleTap: {},
+            onNurseTap: {}
+        )
+        .padding(.horizontal, BTSpacing.pageMargin)
+    }
+}
+
 #Preview("Nursing Active") {
     let container = try! ModelContainer(
-        for: Baby.self, FeedEvent.self, SleepEvent.self,
+        for: Baby.self, FeedEvent.self, SleepEvent.self, WakeEvent.self,
         configurations: ModelConfiguration(isStoredInMemoryOnly: true)
     )
     ZStack {

@@ -19,7 +19,7 @@ struct SleepStateMachineTests {
     private func makeManager() -> ActivityManager {
         let config = ModelConfiguration(isStoredInMemoryOnly: true, cloudKitDatabase: .none)
         let container = try! ModelContainer(
-            for: Baby.self, FeedEvent.self, SleepEvent.self,
+            for: Baby.self, FeedEvent.self, SleepEvent.self, WakeEvent.self,
             configurations: config
         )
         let manager = ActivityManager(modelContext: container.mainContext)

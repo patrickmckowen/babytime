@@ -41,6 +41,7 @@
 ## Patterns That Don't Work
 - Glob can't find directories (like .xcodeproj) - it only finds files
 - Bash commands blocked in Explore mode
+- `Image.scaledToFill().aspectRatio()` — layout size overflows the frame, bleeds behind sibling views. Use `Color.clear.aspectRatio().overlay { Image.scaledToFill() }.clipped()` instead
 
 ## Domain Notes
 - BabyTime: iOS SwiftUI app, iOS 26+, Swift 6, CloudKit

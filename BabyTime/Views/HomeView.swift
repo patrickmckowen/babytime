@@ -100,13 +100,26 @@ struct HomeView: View {
                 onTap: onSleepTap
             )
         } else if let snapshot = activityManager.snapshot {
-            SleepCard(
-                mode: sleepCardMode(from: snapshot),
-                onTap: nil,
-                onWakeTimeSubmit: { time in
-                    activityManager.setWakeTime(time)
+            if snapshot.dayState.isAwakeState, snapshot.wakeReference != nil {
+                // Live-update awake duration every 60 seconds
+                SwiftUI.TimelineView(.periodic(from: .now, by: 60)) { context in
+                    SleepCard(
+                        mode: sleepCardMode(from: snapshot, now: context.date),
+                        onTap: nil,
+                        onWakeTimeSubmit: { time in
+                            activityManager.setWakeTime(time)
+                        }
+                    )
                 }
-            )
+            } else {
+                SleepCard(
+                    mode: sleepCardMode(from: snapshot),
+                    onTap: nil,
+                    onWakeTimeSubmit: { time in
+                        activityManager.setWakeTime(time)
+                    }
+                )
+            }
         } else {
             SleepCard(
                 mode: .wakeTimePrompt(babyName: activityManager.babyName),
@@ -117,7 +130,13 @@ struct HomeView: View {
         }
     }
 
-    private func sleepCardMode(from snapshot: DaySnapshot) -> SleepCard.Mode {
+    private func sleepCardMode(from snapshot: DaySnapshot, now: Date? = nil) -> SleepCard.Mode {
+        // For awake states, recompute minutes from wakeReference if a live `now` is provided
+        let liveWakeMinutes: Int? = {
+            guard let now, let ref = snapshot.wakeReference else { return nil }
+            return max(0, Int(now.timeIntervalSince(ref) / 60))
+        }()
+
         switch snapshot.dayState {
         case .notStarted:
             return .wakeTimePrompt(babyName: activityManager.babyName)
@@ -125,21 +144,21 @@ struct HomeView: View {
         case .awakeEarly(let mins, _):
             return .awake(
                 label: "Awake for",
-                duration: formatMinutes(mins),
+                duration: formatMinutes(liveWakeMinutes ?? mins),
                 detail: wakeDetail(snapshot: snapshot)
             )
 
         case .awakeApproaching(let mins, let range):
             return .awake(
                 label: "Nap window open",
-                duration: formatMinutes(mins),
+                duration: formatMinutes(liveWakeMinutes ?? mins),
                 detail: "Window \(formatMinutes(range.lowerBound))\u{2013}\(formatMinutes(range.upperBound))"
             )
 
         case .awakeBeyond(let mins, let range):
             return .awake(
                 label: "Past wake window",
-                duration: formatMinutes(mins),
+                duration: formatMinutes(liveWakeMinutes ?? mins),
                 detail: "Target was \(formatMinutes(range.upperBound))"
             )
 
@@ -164,10 +183,10 @@ struct HomeView: View {
                 detail: "Past cutoff for bedtime"
             )
 
-        case .napWindowClosed(_, let minsToBed):
+        case .napWindowClosed(let mins, _):
             return .awake(
                 label: "Bridging to bedtime",
-                duration: formatMinutes(minsToBed),
+                duration: formatMinutes(liveWakeMinutes ?? mins),
                 detail: "No more naps today"
             )
 

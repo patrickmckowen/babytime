@@ -155,10 +155,10 @@ final class ActivityManager {
 
     // MARK: - Nursing Actions
 
-    func startNursing(side: NursingSide = .both) {
+    func startNursing(at startTime: Date? = nil, side: NursingSide = .both) {
         guard let baby else { return }
         let event = FeedEvent(
-            startTime: Date(),
+            startTime: startTime ?? Date(),
             kind: .nursing,
             side: side,
             baby: baby
@@ -166,6 +166,13 @@ final class ActivityManager {
         modelContext.insert(event)
         save()
         activeNursingEvent = event
+        refresh()
+    }
+
+    func resumeNursing() {
+        guard let event = activeNursingEvent else { return }
+        event.endTime = nil
+        save()
         refresh()
     }
 
@@ -191,6 +198,21 @@ final class ActivityManager {
             event.endTime = Date()
         }
         save()                  // always persist, even if already stopped
+        activeNursingEvent = nil
+        refresh()
+    }
+
+    func saveNursingManual(startTime: Date, endTime: Date) {
+        guard let baby else { return }
+        let event = FeedEvent(
+            startTime: startTime,
+            endTime: endTime,
+            kind: .nursing,
+            side: .both,
+            baby: baby
+        )
+        modelContext.insert(event)
+        save()
         activeNursingEvent = nil
         refresh()
     }

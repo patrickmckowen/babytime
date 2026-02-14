@@ -12,6 +12,7 @@ import SwiftData
 struct HomeView: View {
     @Environment(ActivityManager.self) private var activityManager
     var onNursingTap: (() -> Void)?
+    var onBottleTap: (() -> Void)?
     var onSleepTap: (() -> Void)?
 
     var body: some View {
@@ -59,6 +60,12 @@ struct HomeView: View {
             FeedCard(
                 mode: .nursingActive,
                 onTap: onNursingTap
+            )
+        } else if activityManager.snapshot?.feedState == .noFeedsYet {
+            FeedCard(
+                mode: .logFirstFeed,
+                onBottleTap: onBottleTap,
+                onNurseTap: onNursingTap
             )
         } else {
             FeedCard(

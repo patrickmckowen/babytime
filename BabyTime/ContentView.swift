@@ -23,6 +23,7 @@ struct ContentView: View {
                 if activityManager.baby != nil {
                     HomeView(
                         onNursingTap: { showNursingSheet = true },
+                        onBottleTap: { showBottleSheet = true },
                         onSleepTap: { showSleepSheet = true }
                     )
                 } else {

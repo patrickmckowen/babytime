@@ -41,6 +41,9 @@ enum BTTypography {
     /// Card primary values — "3:30 PM", "1h 25m" (44pt bold, -2.2 tracking)
     static let headline: Font = .system(size: 44, weight: .bold)
 
+    /// Text-based card headlines — "Ready when you are" (28pt bold, -1.2 tracking)
+    static let headlineSmall: Font = .system(size: 28, weight: .bold)
+
     /// Card labels, subheads, supporting text (17pt medium, -0.2 tracking)
     static let label: Font = .system(size: 17, weight: .medium)
 
@@ -64,6 +67,7 @@ enum BTTypography {
 
 enum BTTracking {
     static let headline: CGFloat = -2.2
+    static let headlineSmall: CGFloat = -1.2
     static let label: CGFloat = -0.2
     static let photoDate: CGFloat = -0.3
     static let photoAge: CGFloat = -0.3

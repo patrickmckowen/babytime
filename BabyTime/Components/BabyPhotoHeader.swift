@@ -9,8 +9,6 @@ import SwiftUI
 
 struct BabyPhotoHeader: View {
     let babyName: String
-    let dateString: String
-    let ageString: String
     var photoData: Data? = nil
     var onPhotoTap: (() -> Void)? = nil
 
@@ -59,20 +57,6 @@ struct BabyPhotoHeader: View {
                         }
                     }
             }
-
-            // Date + age overlay
-            VStack(alignment: .leading, spacing: 2) {
-                Text(dateString)
-                    .font(BTTypography.photoDate)
-                    .tracking(BTTracking.photoDate)
-
-                Text(ageString)
-                    .font(BTTypography.photoAge)
-                    .tracking(BTTracking.photoAge)
-            }
-            .foregroundStyle(photoData != nil ? .white : Color.btTextPrimary)
-            .padding(.horizontal, BTSpacing.pageMargin)
-            .padding(.bottom, 20)
         }
         .contentShape(Rectangle())
         .onTapGesture {
@@ -84,8 +68,6 @@ struct BabyPhotoHeader: View {
 
 #Preview("No photo") {
     BabyPhotoHeader(
-        babyName: "Kaia",
-        dateString: "Monday, February 9",
-        ageString: "3 months old"
+        babyName: "Kaia"
     )
 }

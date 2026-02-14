@@ -383,6 +383,12 @@ final class ActivityManager {
         return formatter.string(from: Date())
     }
 
+    var shortDateDisplayString: String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "EEEE, MMM d"
+        return formatter.string(from: Date())
+    }
+
     var ageDisplayString: String {
         baby?.ageDescription ?? ""
     }

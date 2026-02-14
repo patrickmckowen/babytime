@@ -22,8 +22,6 @@ struct HomeView: View {
                 // 1. Baby photo header (fullbleed)
                 BabyPhotoHeader(
                     babyName: activityManager.babyName,
-                    dateString: activityManager.dateDisplayString,
-                    ageString: activityManager.ageDisplayString,
                     photoData: activityManager.babyPhotoData,
                     onPhotoTap: onPhotoTap
                 )
@@ -38,6 +36,8 @@ struct HomeView: View {
 
                     // 4. Today summary
                     TodaySummaryCard(
+                        dateString: activityManager.shortDateDisplayString,
+                        ageString: activityManager.ageDisplayString,
                         totalSleep: activityManager.totalSleepFormatted,
                         longestSleep: activityManager.longestSleepFormatted,
                         napCount: activityManager.napCount,

@@ -8,6 +8,8 @@
 import SwiftUI
 
 struct TodaySummaryCard: View {
+    let dateString: String
+    let ageString: String
     let totalSleep: String
     let longestSleep: String
     let napCount: Int
@@ -22,11 +24,18 @@ struct TodaySummaryCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            // Header: "Today"
-            Text("Today")
-                .font(BTTypography.photoDate)
-                .tracking(BTTracking.photoDate)
-                .foregroundStyle(Color.btTextPrimary)
+            // Header: Date and age
+            VStack(alignment: .leading, spacing: 2) {
+                Text(dateString)
+                    .font(BTTypography.photoDate)
+                    .tracking(BTTracking.photoDate)
+                    .foregroundStyle(Color.btTextPrimary)
+
+                Text(ageString)
+                    .font(BTTypography.photoAge)
+                    .tracking(BTTracking.photoAge)
+                    .foregroundStyle(Color.btTextSecondary)
+            }
 
             // Wake time row (if set)
             if let wakeTime {
@@ -206,6 +215,8 @@ private struct WakeTimeRow: View {
     ZStack {
         Color.btBackground.ignoresSafeArea()
         TodaySummaryCard(
+            dateString: "Friday, Feb 13",
+            ageString: "3 months old",
             totalSleep: "1h 30m",
             longestSleep: "45m",
             napCount: 3,

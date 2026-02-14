@@ -307,7 +307,16 @@ final class ActivityManager {
 
     func nursingTimerString(at date: Date = Date()) -> String {
         guard let start = nursingStartTime else { return "00:00" }
-        let reference = nursingEndTime ?? date
+
+        let reference: Date
+        if isNursingActive {
+            reference = date              // live ticking
+        } else if let end = nursingEndTime {
+            reference = end               // static stopped duration
+        } else {
+            return "00:00"                // no valid state
+        }
+
         let elapsed = max(0, reference.timeIntervalSince(start))
         let minutes = Int(elapsed) / 60
         let seconds = Int(elapsed) % 60

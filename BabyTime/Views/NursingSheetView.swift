@@ -13,6 +13,14 @@ struct NursingSheetView: View {
     @Environment(ActivityManager.self) private var activityManager
     @Environment(\.dismiss) private var dismiss
 
+    // Cooldown: suppresses timer toggle briefly after a DatePicker tap
+    @State private var pickerInteractionDate: Date?
+
+    private var isPickerRecentlyActive: Bool {
+        guard let d = pickerInteractionDate else { return false }
+        return Date().timeIntervalSince(d) < 0.5
+    }
+
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
@@ -25,6 +33,7 @@ struct NursingSheetView: View {
                 .frame(maxWidth: .infinity)
                 .contentShape(Rectangle())
                 .onTapGesture {
+                    guard !isPickerRecentlyActive else { return }
                     toggleTimer()
                 }
 
@@ -131,9 +140,11 @@ struct NursingSheetView: View {
                             get: { manager.nursingStartTime ?? Date() },
                             set: { manager.nursingStartTime = $0 }
                         ),
+                        in: ...Date(),
                         displayedComponents: [.hourAndMinute]
                     )
                     .labelsHidden()
+                    .simultaneousGesture(TapGesture().onEnded { pickerInteractionDate = Date() })
                 }
             }
             .padding(.vertical, 14)
@@ -158,10 +169,15 @@ struct NursingSheetView: View {
                         get: { manager.nursingEndTime ?? Date() },
                         set: { manager.nursingEndTime = $0 }
                     ),
+                    in: ...Date(),
                     displayedComponents: [.hourAndMinute]
                 )
                 .labelsHidden()
                 .disabled(!hasEnd || activityManager.isNursingActive)
+                .simultaneousGesture(TapGesture().onEnded {
+                    guard !activityManager.isNursingActive else { return }
+                    pickerInteractionDate = Date()
+                })
                 .opacity(hasEnd ? (activityManager.isNursingActive ? 0.5 : 1.0) : 0.0)
                 .overlay {
                     if !hasEnd {

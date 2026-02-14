@@ -192,7 +192,7 @@ struct FeedCard: View {
 
 #Preview("Nursing Active") {
     let container = try! ModelContainer(
-        for: Baby.self, FeedEvent.self, SleepEvent.self,
+        for: Baby.self, FeedEvent.self, SleepEvent.self, WakeEvent.self,
         configurations: ModelConfiguration(isStoredInMemoryOnly: true)
     )
     ZStack {

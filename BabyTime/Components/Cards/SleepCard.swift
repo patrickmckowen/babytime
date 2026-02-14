@@ -10,6 +10,7 @@ import SwiftUI
 struct SleepCard: View {
     let mode: Mode
     var onTap: (() -> Void)?
+    var onWakeTimeSubmit: ((Date) -> Void)?
 
     enum Mode {
         /// Awake states — configurable label, duration, and detail
@@ -18,7 +19,11 @@ struct SleepCard: View {
         case sleeping(label: String, duration: String, detail: String)
         /// Active sleep timer (user started timer from sheet)
         case sleepActive
+        /// Empty state — prompt user for wake time
+        case wakeTimePrompt(babyName: String)
     }
+
+    @State private var selectedWakeTime = Date()
 
     var body: some View {
         Group {
@@ -29,6 +34,8 @@ struct SleepCard: View {
                 sleepingContent(label: label, duration: duration, detail: detail)
             case .sleepActive:
                 sleepActiveContent
+            case .wakeTimePrompt(let babyName):
+                wakeTimePromptContent(babyName: babyName)
             }
         }
         .padding(.top, BTSpacing.cardPaddingTop)
@@ -101,6 +108,40 @@ struct SleepCard: View {
         }
     }
 
+    // MARK: - Wake Time Prompt Content (empty state)
+
+    private func wakeTimePromptContent(babyName: String) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Text("When did \(babyName) wake up?")
+                .font(BTTypography.headlineSmall)
+                .tracking(BTTracking.headlineSmall)
+                .foregroundStyle(Color.btTextPrimary)
+
+            HStack {
+                DatePicker(
+                    "",
+                    selection: $selectedWakeTime,
+                    displayedComponents: .hourAndMinute
+                )
+                .labelsHidden()
+
+                Spacer()
+
+                Button {
+                    onWakeTimeSubmit?(selectedWakeTime)
+                } label: {
+                    Image(systemName: "checkmark")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .frame(width: 44, height: 44)
+                        .background(Color.btSleepAccent)
+                        .clipShape(Circle())
+                }
+            }
+            .padding(.top, 18)
+        }
+    }
+
     // MARK: - Sleep Active Content (live timer)
 
     @Environment(ActivityManager.self) private var activityManager
@@ -154,6 +195,17 @@ struct SleepCard: View {
                 duration: "1h 25m",
                 detail: "Window 1h 15m\u{2013}1h 30m"
             )
+        )
+        .padding(.horizontal, BTSpacing.pageMargin)
+    }
+}
+
+#Preview("Wake Time Prompt") {
+    ZStack {
+        Color.btBackground.ignoresSafeArea()
+        SleepCard(
+            mode: .wakeTimePrompt(babyName: "Kaia"),
+            onWakeTimeSubmit: { _ in }
         )
         .padding(.horizontal, BTSpacing.pageMargin)
     }

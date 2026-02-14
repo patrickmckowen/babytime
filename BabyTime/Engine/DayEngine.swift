@@ -18,6 +18,7 @@ enum DayEngine {
         baby: Baby,
         feeds: [FeedEvent],
         sleeps: [SleepEvent],
+        wakeTime: Date? = nil,
         now: Date
     ) -> DaySnapshot {
         let ageInDays = baby.ageInDays(at: now)
@@ -37,6 +38,7 @@ enum DayEngine {
         let dayState = deriveDayState(
             activeSleep: activeSleep,
             lastSleepEnd: latestSleepEnd(completedSleeps),
+            wakeTime: wakeTime,
             firstEventTime: earliestEventTime(feeds: feeds, sleeps: sleeps),
             now: now,
             currentWW: currentWW,
@@ -58,7 +60,8 @@ enum DayEngine {
             totalFeedCount: feedCount,
             napCutoff: napCutoff,
             bedtime: bedtime,
-            ageTable: ageTable
+            ageTable: ageTable,
+            wakeTime: wakeTime
         )
     }
 
@@ -74,14 +77,15 @@ enum DayEngine {
     private static func deriveDayState(
         activeSleep: SleepEvent?,
         lastSleepEnd: Date?,
+        wakeTime: Date?,
         firstEventTime: Date?,
         now: Date,
         currentWW: ClosedRange<Int>,
         napCutoff: Date,
         bedtime: Date
     ) -> DayState {
-        // No events today → not started
-        guard let firstEvent = firstEventTime else {
+        // No events and no wake time → not started
+        guard let wakeReference = lastSleepEnd ?? wakeTime ?? firstEventTime else {
             return .notStarted
         }
 
@@ -111,7 +115,6 @@ enum DayEngine {
         }
 
         // Awake — calculate wake duration
-        let wakeReference = lastSleepEnd ?? firstEvent
         let wakeMinutes = Int(now.timeIntervalSince(wakeReference) / 60)
 
         // Bedtime window (within 30 minutes of bedtime)

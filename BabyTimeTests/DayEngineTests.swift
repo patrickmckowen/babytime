@@ -223,6 +223,76 @@ struct DayStateTests {
         }
     }
 
+    @Test("Wake time as sole wake reference (no events)")
+    func wakeTimeOnly() {
+        let baby = makeBaby(ageDays: 100, referenceDate: now)
+        // Wake time set 60 min ago, no feeds or sleeps
+        let wakeTime = now.addingTimeInterval(-60 * 60)
+
+        let snapshot = DayEngine.snapshot(
+            baby: baby, feeds: [], sleeps: [], wakeTime: wakeTime, now: now
+        )
+
+        // Should use wakeTime as reference → awakeEarly (60 min, WW1 for 3-4mo = 75...90)
+        if case .awakeEarly(let mins, _) = snapshot.dayState {
+            #expect(mins == 60)
+        } else {
+            Issue.record("Expected awakeEarly, got \(snapshot.dayState)")
+        }
+        #expect(snapshot.wakeTime == wakeTime)
+    }
+
+    @Test("Wake time ignored when lastSleepEnd exists")
+    func wakeTimeOverriddenBySleepEnd() {
+        let baby = makeBaby(ageDays: 90, referenceDate: now)
+        // Wake time at 7 AM (7 hours ago)
+        let wakeTime = now.addingTimeInterval(-7 * 60 * 60)
+        // Sleep ended 30 min ago — should take priority
+        let sleep = makeSleep(startedMinutesAgo: 60, durationMinutes: 30, referenceDate: now)
+        let feed = makeFeed(minutesAgo: 30, referenceDate: now)
+
+        let snapshot = DayEngine.snapshot(
+            baby: baby, feeds: [feed], sleeps: [sleep], wakeTime: wakeTime, now: now
+        )
+
+        // lastSleepEnd (30 min ago) takes priority over wakeTime (7h ago)
+        if case .awakeEarly(let mins, _) = snapshot.dayState {
+            #expect(mins == 30)
+        } else {
+            Issue.record("Expected awakeEarly with 30 min, got \(snapshot.dayState)")
+        }
+    }
+
+    @Test("Wake time used when no sleeps but feeds exist")
+    func wakeTimeWithFeedsNoSleeps() {
+        let baby = makeBaby(ageDays: 90, referenceDate: now)
+        // Wake time 80 min ago, feed 30 min ago
+        let wakeTime = now.addingTimeInterval(-80 * 60)
+        let feed = makeFeed(minutesAgo: 30, referenceDate: now)
+
+        let snapshot = DayEngine.snapshot(
+            baby: baby, feeds: [feed], sleeps: [], wakeTime: wakeTime, now: now
+        )
+
+        // wakeTime (80 min) should be used over firstEvent (30 min)
+        // 80 min, WW1 for 3-4mo = 75...90 → approaching
+        if case .awakeApproaching(let mins, _) = snapshot.dayState {
+            #expect(mins == 80)
+        } else {
+            Issue.record("Expected awakeApproaching with 80 min, got \(snapshot.dayState)")
+        }
+    }
+
+    @Test("No wake time, no events → notStarted")
+    func noWakeTimeNoEvents() {
+        let baby = makeBaby(ageDays: 100, referenceDate: now)
+        let snapshot = DayEngine.snapshot(
+            baby: baby, feeds: [], sleeps: [], wakeTime: nil, now: now
+        )
+        #expect(snapshot.dayState == .notStarted)
+        #expect(snapshot.wakeTime == nil)
+    }
+
     @Test("Progressive wake windows — WW2 after one nap")
     func progressiveWakeWindowAfterNap() {
         let baby = makeBaby(ageDays: 90, referenceDate: now) // 3-4 months

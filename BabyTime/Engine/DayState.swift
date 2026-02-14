@@ -65,4 +65,5 @@ struct DaySnapshot: Equatable, Sendable {
     let napCutoff: Date
     let bedtime: Date
     let ageTable: AgeTable
+    let wakeTime: Date?
 }

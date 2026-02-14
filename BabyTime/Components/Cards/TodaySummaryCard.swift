@@ -14,6 +14,11 @@ struct TodaySummaryCard: View {
     let totalOz: String
     let feedCount: Int
     let averageOz: String
+    var wakeTime: String? = nil
+    var onWakeTimeChanged: ((Date) -> Void)? = nil
+
+    @State private var isEditingWakeTime = false
+    @State private var editWakeTime = Date()
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -22,6 +27,26 @@ struct TodaySummaryCard: View {
                 .font(BTTypography.photoDate)
                 .tracking(BTTracking.photoDate)
                 .foregroundStyle(Color.btTextPrimary)
+
+            // Wake time row (if set)
+            if let wakeTime {
+                WakeTimeRow(
+                    wakeTime: wakeTime,
+                    isEditing: $isEditingWakeTime,
+                    editTime: $editWakeTime,
+                    onConfirm: {
+                        onWakeTimeChanged?(editWakeTime)
+                        isEditingWakeTime = false
+                    }
+                )
+                .padding(.top, BTSpacing.todayHeaderToRow)
+
+                // Divider
+                Rectangle()
+                    .fill(Color.btDivider)
+                    .frame(height: 1)
+                    .padding(.vertical, BTSpacing.rowDividerPadding)
+            }
 
             // Sleep row
             SummaryRow(
@@ -33,7 +58,7 @@ struct TodaySummaryCard: View {
                     StatColumn(label: "Total", value: totalSleep)
                 ]
             )
-            .padding(.top, BTSpacing.todayHeaderToRow)
+            .padding(.top, wakeTime == nil ? BTSpacing.todayHeaderToRow : 0)
 
             // Divider
             Rectangle()
@@ -105,6 +130,71 @@ private struct SummaryRow: View {
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
                 }
+            }
+        }
+    }
+}
+
+// MARK: - Wake Time Row
+
+private struct WakeTimeRow: View {
+    let wakeTime: String
+    @Binding var isEditing: Bool
+    @Binding var editTime: Date
+    var onConfirm: () -> Void
+
+    var body: some View {
+        HStack(spacing: BTSpacing.iconToStat) {
+            // Icon container
+            RoundedRectangle(cornerRadius: BTRadius.iconContainer, style: .continuous)
+                .fill(Color.btSleepAccent.opacity(0.10))
+                .frame(width: BTIconSize.container, height: BTIconSize.container)
+                .overlay {
+                    Image(systemName: "sunrise.fill")
+                        .font(.system(size: 16, weight: .medium))
+                        .foregroundStyle(Color.btSleepAccent)
+                }
+
+            if isEditing {
+                DatePicker(
+                    "",
+                    selection: $editTime,
+                    displayedComponents: .hourAndMinute
+                )
+                .labelsHidden()
+
+                Spacer()
+
+                Button {
+                    onConfirm()
+                } label: {
+                    Image(systemName: "checkmark")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .frame(width: 32, height: 32)
+                        .background(Color.btSleepAccent)
+                        .clipShape(Circle())
+                }
+            } else {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Wake")
+                        .font(BTTypography.statLabel)
+                        .tracking(BTTracking.statLabel)
+                        .foregroundStyle(Color.btTextMuted)
+
+                    Text(wakeTime)
+                        .font(BTTypography.statValue)
+                        .tracking(BTTracking.statValue)
+                        .foregroundStyle(Color.btTextPrimary)
+                }
+
+                Spacer()
+            }
+        }
+        .contentShape(Rectangle())
+        .onTapGesture {
+            if !isEditing {
+                isEditing = true
             }
         }
     }

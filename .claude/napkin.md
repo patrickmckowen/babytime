@@ -15,6 +15,7 @@
 | 2026-02-14 | self | Complex SwiftUI body with existential types `(any Protocol)?` + nested ForEach/Section caused "unable to type-check" | Break up body into extracted computed properties/methods; use concrete enum instead of protocol existential; use List not ScrollView for swipeActions |
 | 2026-02-14 | user | Bottle source (breastMilk vs formula) not used in display | Don't include "of Breast Milk" in activity descriptions |
 | 2026-02-15 | self | DatePicker shows `?? Date()` default but `@State` draft stays nil until user interacts | When one draft time is set, auto-initialize the companion to `Date()` so displayed value matches internal state |
+| 2026-02-15 | self | Running `xcodebuild test` without `-only-testing` included BabyTimeUITests, which spawns simulator clones per UI config (runsForEachTargetApplicationUIConfiguration) and OOM'd the machine | ALWAYS use `-only-testing:BabyTimeTests`. Never run BabyTimeUITests. See CLAUDE.md Testing section and xcodebuildmcp guide.md |
 
 ## User Preferences
 - Ask questions, don't guess or assume
@@ -45,11 +46,13 @@
 - Edit mode on existing sheets: add optional `editingEvent` param, `isEditing` computed prop, seed `@State` drafts in `.onAppear`, branch save/reset logic on isEditing
 - LogEntry enum wrapping FeedEvent/SleepEvent works well for unified list display with PersistentIdentifier as Identifiable id
 - `.swipeActions` requires List context, not LazyVStack — use List with .plain style + .scrollContentBackground(.hidden) for custom backgrounds
+- Always use `-only-testing:BabyTimeTests` for test runs — pure unit tests, in-memory SwiftData, no simulator UI, completes in seconds
 
 ## Patterns That Don't Work
 - Glob can't find directories (like .xcodeproj) - it only finds files
 - Bash commands blocked in Explore mode
 - `Image.scaledToFill().aspectRatio()` — layout size overflows the frame, bleeds behind sibling views. Use `Color.clear.aspectRatio().overlay { Image.scaledToFill() }.clipped()` instead
+- `xcodebuild test` without `-only-testing:BabyTimeTests` — runs BabyTimeUITests which spawns simulator clones and OOMs the machine. Always scope to unit tests only
 
 ## Domain Notes
 - BabyTime: iOS SwiftUI app, iOS 26+, Swift 6, CloudKit

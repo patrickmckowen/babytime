@@ -81,4 +81,8 @@ struct DaySnapshot: Equatable, Sendable {
     /// The date used to compute awake duration (lastSleepEnd ?? wakeTime ?? firstEventTime).
     /// Used by the view layer to live-compute elapsed awake time without recomputing the full snapshot.
     let wakeReference: Date?
+
+    /// The last completed feed's startTime.
+    /// Used by the view layer to live-compute "last fed X ago" via TimelineView.
+    let lastFeedReference: Date?
 }

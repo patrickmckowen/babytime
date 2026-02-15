@@ -528,10 +528,9 @@ final class ActivityManager {
 
     var totalDailyFeeds: Int {
         guard let baby else { return 7 }
-        let intervalMinutes = baby.effectiveFeedIntervalMinutes
-        let awakeHours = 14
-        let feeds = (awakeHours * 60) / intervalMinutes
-        return max(3, min(feeds, 12))
+        let table = AgeTable.forAge(days: baby.ageInDays)
+        let range = table.expectedFeedsPerDay
+        return (range.lowerBound + range.upperBound) / 2
     }
 
     var remainingFeeds: Int {
@@ -547,7 +546,7 @@ final class ActivityManager {
 
     var offerAmountOz: Int {
         let amount = remainingOz / Double(remainingFeeds)
-        return max(1, Int(amount.rounded()))
+        return max(1, min(6, Int(amount.rounded())))
     }
 
     var nextFeedTimeFormatted: String {

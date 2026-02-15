@@ -287,6 +287,63 @@ final class ActivityManager {
         refresh()
     }
 
+    // MARK: - Event Queries (all history)
+
+    func allFeedEvents() -> [FeedEvent] {
+        guard let baby else { return [] }
+        return (baby.feedEvents ?? []).sorted { $0.startTime > $1.startTime }
+    }
+
+    func allSleepEvents() -> [SleepEvent] {
+        guard let baby else { return [] }
+        return (baby.sleepEvents ?? []).sorted { $0.startTime > $1.startTime }
+    }
+
+    // MARK: - Delete Events
+
+    func deleteFeedEvent(_ event: FeedEvent) {
+        if activeNursingEvent === event {
+            activeNursingEvent = nil
+        }
+        modelContext.delete(event)
+        save()
+        refresh()
+    }
+
+    func deleteSleepEvent(_ event: SleepEvent) {
+        if activeSleepEvent === event {
+            activeSleepEvent = nil
+        }
+        modelContext.delete(event)
+        save()
+        refresh()
+    }
+
+    // MARK: - Update Events
+
+    func updateFeedEvent(_ event: FeedEvent, amountOz: Double, at time: Date) {
+        event.startTime = time
+        event.endTime = time
+        event.amountOz = amountOz
+        save()
+        refresh()
+    }
+
+    func updateNursingEvent(_ event: FeedEvent, startTime: Date, endTime: Date, side: NursingSide) {
+        event.startTime = startTime
+        event.endTime = endTime
+        event.side = side
+        save()
+        refresh()
+    }
+
+    func updateSleepEvent(_ event: SleepEvent, startTime: Date, endTime: Date) {
+        event.startTime = startTime
+        event.endTime = endTime
+        save()
+        refresh()
+    }
+
     // MARK: - Wake Time Actions
 
     func setWakeTime(_ time: Date) {
@@ -497,6 +554,9 @@ final class ActivityManager {
         guard let feed = lastFeed, let baby else { return "--" }
         let intervalMinutes = Double(baby.effectiveFeedIntervalMinutes)
         let nextTime = feed.startTime.addingTimeInterval(intervalMinutes * 60)
+        if nextTime <= Date() {
+            return "Now"
+        }
         return nextTime.shortTime
     }
 

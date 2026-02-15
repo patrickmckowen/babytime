@@ -19,7 +19,7 @@ struct BabyPhotoHeader: View {
                 // Has photo — Color.clear establishes the 4:3 frame,
                 // image fills via overlay, clipped to the frame bounds
                 Color.clear
-                    .aspectRatio(4 / 3, contentMode: .fit)
+                    .aspectRatio(1, contentMode: .fit)
                     .overlay {
                         Image(uiImage: uiImage)
                             .resizable()
@@ -38,7 +38,7 @@ struct BabyPhotoHeader: View {
             } else {
                 // Empty state: placeholder with initial + "Add photo"
                 Color.btPhotoPlaceholder
-                    .aspectRatio(4 / 3, contentMode: .fit)
+                    .aspectRatio(1, contentMode: .fit)
                     .overlay {
                         VStack(spacing: 8) {
                             Circle()

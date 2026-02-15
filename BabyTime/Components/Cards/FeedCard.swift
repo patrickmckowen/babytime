@@ -15,7 +15,7 @@ struct FeedCard: View {
     var onNurseTap: (() -> Void)?
 
     enum Mode {
-        case nextFeed(offerAmountOz: Int, nextFeedTime: String, lastFeedAmount: String, lastFeedAgo: String)
+        case nextFeed(lastFedAgo: String, offerDetail: String)
         case nursingActive
         case logFirstFeed
     }
@@ -23,13 +23,8 @@ struct FeedCard: View {
     var body: some View {
         Group {
             switch mode {
-            case .nextFeed(let offerAmountOz, let nextFeedTime, let lastFeedAmount, let lastFeedAgo):
-                nextFeedContent(
-                    offerAmountOz: offerAmountOz,
-                    nextFeedTime: nextFeedTime,
-                    lastFeedAmount: lastFeedAmount,
-                    lastFeedAgo: lastFeedAgo
-                )
+            case .nextFeed(let lastFedAgo, let offerDetail):
+                nextFeedContent(lastFedAgo: lastFedAgo, offerDetail: offerDetail)
             case .nursingActive:
                 nursingActiveContent
             case .logFirstFeed:
@@ -51,24 +46,22 @@ struct FeedCard: View {
     // MARK: - Next Feed Content
 
     private func nextFeedContent(
-        offerAmountOz: Int,
-        nextFeedTime: String,
-        lastFeedAmount: String,
-        lastFeedAgo: String
+        lastFedAgo: String,
+        offerDetail: String
     ) -> some View {
         VStack(alignment: .leading, spacing: 0) {
-            Text("Offer \(offerAmountOz) oz by")
+            Text("Last fed")
                 .font(BTTypography.label)
                 .tracking(BTTracking.label)
                 .foregroundStyle(Color.btTextSecondary)
 
-            Text(nextFeedTime)
+            Text(lastFedAgo)
                 .font(BTTypography.headline)
                 .tracking(BTTracking.headline)
                 .foregroundStyle(Color.btTextPrimary)
                 .padding(.top, BTSpacing.labelToHeadline)
 
-            Text("Last fed \(lastFeedAgo) ago · \(lastFeedAmount)")
+            Text(offerDetail)
                 .font(BTTypography.label)
                 .tracking(BTTracking.label)
                 .foregroundStyle(Color.btTextSecondary)
@@ -168,10 +161,8 @@ struct FeedCard: View {
         Color.btBackground.ignoresSafeArea()
         FeedCard(
             mode: .nextFeed(
-                offerAmountOz: 5,
-                nextFeedTime: "3:30 PM",
-                lastFeedAmount: "4 oz",
-                lastFeedAgo: "1h 25m"
+                lastFedAgo: "1h 50m",
+                offerDetail: "Offer 4oz by 3:00 PM"
             )
         )
         .padding(.horizontal, BTSpacing.pageMargin)

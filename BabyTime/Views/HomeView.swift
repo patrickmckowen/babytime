@@ -81,10 +81,8 @@ struct HomeView: View {
             SwiftUI.TimelineView(.periodic(from: .now, by: 60)) { context in
                 FeedCard(
                     mode: .nextFeed(
-                        offerAmountOz: activityManager.offerAmountOz,
-                        nextFeedTime: nextFeedTimeString(feedRef: feedRef, now: context.date),
-                        lastFeedAmount: activityManager.lastFeedOzFormatted,
-                        lastFeedAgo: formatMinutes(Int(context.date.timeIntervalSince(feedRef) / 60))
+                        lastFedAgo: formatMinutes(Int(context.date.timeIntervalSince(feedRef) / 60)),
+                        offerDetail: "Offer \(activityManager.offerAmountOz)oz by \(nextFeedTimeString(feedRef: feedRef, now: context.date))"
                     ),
                     onTap: nil
                 )
@@ -92,10 +90,8 @@ struct HomeView: View {
         } else {
             FeedCard(
                 mode: .nextFeed(
-                    offerAmountOz: activityManager.offerAmountOz,
-                    nextFeedTime: activityManager.nextFeedTimeFormatted,
-                    lastFeedAmount: activityManager.lastFeedOzFormatted,
-                    lastFeedAgo: activityManager.timeSinceLastFeedDuration
+                    lastFedAgo: activityManager.timeSinceLastFeedDuration,
+                    offerDetail: "Offer \(activityManager.offerAmountOz)oz by \(activityManager.nextFeedTimeFormatted)"
                 ),
                 onTap: nil
             )

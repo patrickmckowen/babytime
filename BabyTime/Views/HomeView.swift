@@ -75,6 +75,20 @@ struct HomeView: View {
                 onBottleTap: onBottleTap,
                 onNurseTap: onNursingTap
             )
+        } else if let snapshot = activityManager.snapshot,
+                  let feedRef = snapshot.lastFeedReference {
+            // Live-update "last fed X ago" and "next feed" every 60 seconds
+            SwiftUI.TimelineView(.periodic(from: .now, by: 60)) { context in
+                FeedCard(
+                    mode: .nextFeed(
+                        offerAmountOz: activityManager.offerAmountOz,
+                        nextFeedTime: nextFeedTimeString(feedRef: feedRef, now: context.date),
+                        lastFeedAmount: activityManager.lastFeedOzFormatted,
+                        lastFeedAgo: formatMinutes(Int(context.date.timeIntervalSince(feedRef) / 60))
+                    ),
+                    onTap: nil
+                )
+            }
         } else {
             FeedCard(
                 mode: .nextFeed(
@@ -205,6 +219,16 @@ struct HomeView: View {
         } else {
             return ""
         }
+    }
+
+    private func nextFeedTimeString(feedRef: Date, now: Date) -> String {
+        guard let baby = activityManager.baby else { return "--" }
+        let intervalMinutes = Double(baby.effectiveFeedIntervalMinutes)
+        let nextTime = feedRef.addingTimeInterval(intervalMinutes * 60)
+        if nextTime <= now {
+            return "Now"
+        }
+        return nextTime.shortTime
     }
 
     private func formatMinutes(_ mins: Int) -> String {

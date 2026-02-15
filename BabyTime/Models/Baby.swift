@@ -23,6 +23,9 @@ final class Baby {
     var dreamFeedHour: Int = 22
     var dreamFeedMinute: Int = 30
 
+    /// Custom feed interval in minutes. 0 = use age-based default from AgeTable.
+    var customFeedIntervalMinutes: Int = 0
+
     /// Profile photo — stored externally via CloudKit CKAsset
     @Attribute(.externalStorage) var photoData: Data?
 
@@ -91,6 +94,15 @@ extension Baby {
         components.minute = dreamFeedMinute
         components.second = 0
         return calendar.date(from: components)
+    }
+
+    /// Effective feed interval in minutes — custom if set, otherwise AgeTable midpoint.
+    var effectiveFeedIntervalMinutes: Int {
+        if customFeedIntervalMinutes > 0 {
+            return customFeedIntervalMinutes
+        }
+        let table = AgeTable.forAge(days: ageInDays)
+        return (table.feedIntervalMinutes.lowerBound + table.feedIntervalMinutes.upperBound) / 2
     }
 
     var ageDescription: String {

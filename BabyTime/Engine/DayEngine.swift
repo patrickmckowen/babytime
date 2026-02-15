@@ -50,11 +50,19 @@ enum DayEngine {
             bedtime: bedtime
         )
 
+        let feedInterval: ClosedRange<Int>
+        if baby.customFeedIntervalMinutes > 0 {
+            let custom = baby.customFeedIntervalMinutes
+            feedInterval = custom...custom
+        } else {
+            feedInterval = ageTable.feedIntervalMinutes
+        }
+
         let feedState = deriveFeedState(
             activeFeed: activeFeed,
             lastCompletedFeed: latestCompletedFeed(feeds),
             now: now,
-            feedInterval: ageTable.feedIntervalMinutes
+            feedInterval: feedInterval
         )
 
         return DaySnapshot(

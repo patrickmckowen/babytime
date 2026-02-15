@@ -577,3 +577,58 @@ struct NursingOzRateTests {
         #expect(table.nursingOzPerMinute(at: afternoon) == 0.15)
     }
 }
+
+// MARK: - Age Bracket Boundary Tests
+
+@Suite("AgeTable — Bracket Boundaries")
+struct AgeBracketBoundaryTests {
+
+    @Test("Day 119 → 3-4 month bracket")
+    func day119Is3to4mo() {
+        let table = AgeTable.forAge(days: 119)
+        #expect(table.ageLabel == "3-4 months")
+        #expect(table.expectedFeedsPerDay == 6...8)
+    }
+
+    @Test("Day 120 → 3-4 month bracket (not 5-7mo)")
+    func day120Is3to4mo() {
+        let table = AgeTable.forAge(days: 120)
+        #expect(table.ageLabel == "3-4 months")
+        #expect(table.expectedFeedsPerDay == 6...8)
+        #expect(table.dailyIntakeOz == 24...32)
+    }
+
+    @Test("Day 149 → 3-4 month bracket (end of range)")
+    func day149Is3to4mo() {
+        let table = AgeTable.forAge(days: 149)
+        #expect(table.ageLabel == "3-4 months")
+        #expect(table.expectedFeedsPerDay == 6...8)
+    }
+
+    @Test("Day 150 → 5-7 month bracket")
+    func day150Is5to7mo() {
+        let table = AgeTable.forAge(days: 150)
+        #expect(table.ageLabel == "5-7 months")
+        #expect(table.expectedFeedsPerDay == 5...6)
+        #expect(table.dailyIntakeOz == 24...36)
+    }
+
+    @Test("Feed suggestion at day 120 with 13oz consumed and 3 feeds → 4oz not 6oz")
+    func feedSuggestionAtDay120() {
+        let table = AgeTable.forAge(days: 120)
+        let dailyMidpoint = Double(table.dailyIntakeOz.lowerBound + table.dailyIntakeOz.upperBound) / 2
+        let totalDailyFeeds = (table.expectedFeedsPerDay.lowerBound + table.expectedFeedsPerDay.upperBound) / 2
+
+        let consumedOz: Double = 13
+        let feedsDone = 3
+        let remainingOz = max(0, dailyMidpoint - consumedOz)
+        let remainingFeeds = max(1, totalDailyFeeds - feedsDone)
+        let suggestion = max(1, min(6, Int((remainingOz / Double(remainingFeeds)).rounded())))
+
+        // With correct 3-4mo bracket: midpoint=28, feeds=7, remaining=15/4=3.75 → 4oz
+        #expect(dailyMidpoint == 28)
+        #expect(totalDailyFeeds == 7)
+        #expect(remainingFeeds == 4)
+        #expect(suggestion == 4)
+    }
+}

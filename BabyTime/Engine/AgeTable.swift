@@ -48,8 +48,8 @@ struct AgeTable: Sendable, Equatable {
     var dailyIntakeOz: ClosedRange<Int> {
         switch ageRangeDays.lowerBound {
         case 0..<60: return 14...28
-        case 60..<120: return 24...32
-        case 120..<210: return 24...36
+        case 60..<150: return 24...32
+        case 150..<210: return 24...36
         case 210..<300: return 24...32
         default: return 20...28
         }
@@ -58,8 +58,8 @@ struct AgeTable: Sendable, Equatable {
     /// Daily sleep target in hours
     var dailySleepHours: ClosedRange<Int> {
         switch ageRangeDays.lowerBound {
-        case 0..<120: return 14...17
-        case 120..<210: return 12...16
+        case 0..<150: return 14...17
+        case 150..<210: return 12...16
         default: return 12...15
         }
     }
@@ -93,19 +93,19 @@ extension AgeTable {
             feedIntervalMinutes: 120...180,
             expectedFeedsPerDay: 8...12
         ),
-        // 3-4 months (60-119 days)
+        // 3-4 months (60-149 days)
         AgeTable(
             ageLabel: "3-4 months",
-            ageRangeDays: 60..<120,
+            ageRangeDays: 60..<150,
             typicalNapsPerDay: 3...4,
             wakeWindows: [75...90, 90...105, 90...105, 105...120, 105...120],
             feedIntervalMinutes: 150...210,
             expectedFeedsPerDay: 6...8
         ),
-        // 5-7 months (120-209 days)
+        // 5-7 months (150-209 days)
         AgeTable(
             ageLabel: "5-7 months",
-            ageRangeDays: 120..<210,
+            ageRangeDays: 150..<210,
             typicalNapsPerDay: 2...3,
             wakeWindows: [105...150, 120...165, 135...180, 150...180],
             feedIntervalMinutes: 180...240,

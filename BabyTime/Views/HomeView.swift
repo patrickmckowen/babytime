@@ -149,11 +149,11 @@ struct HomeView: View {
         case .notStarted:
             return .wakeTimePrompt(babyName: activityManager.babyName)
 
-        case .awakeEarly(let mins, _):
+        case .awakeEarly(let mins, let range):
             return .awake(
                 label: "Awake for",
                 duration: formatMinutes(liveWakeMinutes ?? mins),
-                detail: wakeDetail(snapshot: snapshot)
+                detail: "Wake window \(formatMinutes(range.lowerBound))\u{2013}\(formatMinutes(range.upperBound))"
             )
 
         case .awakeApproaching(let mins, let range):

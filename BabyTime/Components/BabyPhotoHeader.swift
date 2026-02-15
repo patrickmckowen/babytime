@@ -11,8 +11,6 @@ struct BabyPhotoHeader: View {
     let babyName: String
     var photoData: Data? = nil
     var onPhotoTap: (() -> Void)? = nil
-    var onSettingsTap: (() -> Void)? = nil
-    var onLogTap: (() -> Void)? = nil
 
     var body: some View {
         ZStack(alignment: .bottomLeading) {
@@ -58,36 +56,6 @@ struct BabyPhotoHeader: View {
                                 .foregroundStyle(Color.btTextSecondary)
                         }
                     }
-            }
-        }
-        .overlay(alignment: .topLeading) {
-            if !babyName.isEmpty {
-                HStack {
-                    Button {
-                        onSettingsTap?()
-                    } label: {
-                        Text(babyName)
-                            .font(.body)
-                            .foregroundStyle(Color.btTextPrimary)
-                            .frame(height: 44)
-                            .padding(.horizontal, 12)
-                    }
-                    .glassEffect(.regular.interactive(), in: .capsule)
-
-                    Spacer()
-
-                    Button {
-                        onLogTap?()
-                    } label: {
-                        Image(systemName: "calendar")
-                            .font(.body)
-                            .foregroundStyle(Color.btTextPrimary)
-                            .frame(width: 44, height: 44)
-                    }
-                    .glassEffect(.regular.interactive(), in: .circle)
-                }
-                .padding(.top, 54)
-                .padding(.horizontal, BTSpacing.pageMargin)
             }
         }
         .contentShape(Rectangle())

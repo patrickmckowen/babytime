@@ -29,9 +29,7 @@ struct ContentView: View {
                         onNursingTap: { showNursingSheet = true },
                         onBottleTap: { showBottleSheet = true },
                         onSleepTap: { showSleepSheet = true },
-                        onPhotoTap: { showPhotoPicker = true },
-                        onSettingsTap: { showSettings = true },
-                        onLogTap: { showLog = true }
+                        onPhotoTap: { showPhotoPicker = true }
                     )
                 } else {
                     WelcomeView()
@@ -40,28 +38,71 @@ struct ContentView: View {
             .navigationDestination(isPresented: $showLog) {
                 ActivityLogView()
             }
+            .navigationDestination(isPresented: $showSettings) {
+                SettingsView()
+            }
         }
-        .toolbar {
+        .safeAreaInset(edge: .bottom) {
             if activityManager.baby != nil {
-                ToolbarItemGroup(placement: .bottomBar) {
+                HStack {
+                    // Left: Calendar → Activity Log
                     Button {
-                        showNursingSheet = true
+                        showLog = true
                     } label: {
-                        Image(systemName: "drop.fill")
+                        Image(systemName: "calendar")
+                            .font(.body)
+                            .foregroundStyle(Color.btTextPrimary)
+                            .frame(width: 44, height: 44)
                     }
+                    .glassEffect(.regular.interactive(), in: .circle)
 
-                    Button {
-                        showBottleSheet = true
-                    } label: {
-                        Image(systemName: "waterbottle.fill")
-                    }
+                    Spacer()
 
-                    Button {
-                        showSleepSheet = true
-                    } label: {
-                        Image(systemName: "moon.zzz.fill")
+                    // Center: Log actions grouped in capsule
+                    HStack(spacing: 0) {
+                        Button {
+                            showNursingSheet = true
+                        } label: {
+                            Image(systemName: "drop.fill")
+                                .font(.body)
+                                .foregroundStyle(Color.btTextPrimary)
+                                .frame(width: 44, height: 44)
+                        }
+
+                        Button {
+                            showBottleSheet = true
+                        } label: {
+                            Image(systemName: "waterbottle.fill")
+                                .font(.body)
+                                .foregroundStyle(Color.btTextPrimary)
+                                .frame(width: 44, height: 44)
+                        }
+
+                        Button {
+                            showSleepSheet = true
+                        } label: {
+                            Image(systemName: "moon.zzz.fill")
+                                .font(.body)
+                                .foregroundStyle(Color.btTextPrimary)
+                                .frame(width: 44, height: 44)
+                        }
                     }
+                    .glassEffect(.regular.interactive(), in: .capsule)
+
+                    Spacer()
+
+                    // Right: Settings
+                    Button {
+                        showSettings = true
+                    } label: {
+                        Image(systemName: "slider.horizontal.3")
+                            .font(.body)
+                            .foregroundStyle(Color.btTextPrimary)
+                            .frame(width: 44, height: 44)
+                    }
+                    .glassEffect(.regular.interactive(), in: .circle)
                 }
+                .padding(.horizontal, BTSpacing.pageMargin)
             }
         }
         .sheet(isPresented: $showNursingSheet) {
@@ -72,9 +113,6 @@ struct ContentView: View {
         }
         .sheet(isPresented: $showSleepSheet) {
             SleepSheetView()
-        }
-        .sheet(isPresented: $showSettings) {
-            SettingsView()
         }
         .photosPicker(
             isPresented: $showPhotoPicker,

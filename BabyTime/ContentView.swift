@@ -43,7 +43,7 @@ struct ContentView: View {
             }
         }
         .safeAreaInset(edge: .bottom) {
-            if activityManager.baby != nil {
+            if activityManager.baby != nil && !showLog && !showSettings {
                 HStack {
                     // Left: Calendar → Activity Log
                     Button {

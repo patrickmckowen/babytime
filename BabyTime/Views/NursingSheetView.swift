@@ -240,6 +240,8 @@ struct NursingSheetView: View {
                     activityManager.nursingStartTime = newValue
                 } else {
                     draftStartTime = newValue
+                    // Auto-initialize end time so duration displays and save enables
+                    if draftEndTime == nil { draftEndTime = Date() }
                 }
             }
         )
@@ -255,6 +257,8 @@ struct NursingSheetView: View {
                     activityManager.nursingEndTime = newValue
                 } else {
                     draftEndTime = newValue
+                    // Auto-initialize start time so duration displays and save enables
+                    if draftStartTime == nil { draftStartTime = Date() }
                 }
             }
         )

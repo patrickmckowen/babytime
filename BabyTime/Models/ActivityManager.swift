@@ -469,7 +469,13 @@ final class ActivityManager {
         return Int(Date().timeIntervalSince(endTime) / 60)
     }
 
-    var totalDailyFeeds: Int { 7 }
+    var totalDailyFeeds: Int {
+        guard let baby else { return 7 }
+        let intervalMinutes = baby.effectiveFeedIntervalMinutes
+        let awakeHours = 14
+        let feeds = (awakeHours * 60) / intervalMinutes
+        return max(3, min(feeds, 12))
+    }
 
     var remainingFeeds: Int {
         max(1, totalDailyFeeds - feedCount)
@@ -489,9 +495,8 @@ final class ActivityManager {
 
     var nextFeedTimeFormatted: String {
         guard let feed = lastFeed, let baby else { return "--" }
-        let table = AgeTable.forAge(days: baby.ageInDays)
-        let midpoint = Double(table.feedIntervalMinutes.lowerBound + table.feedIntervalMinutes.upperBound) / 2
-        let nextTime = feed.startTime.addingTimeInterval(midpoint * 60)
+        let intervalMinutes = Double(baby.effectiveFeedIntervalMinutes)
+        let nextTime = feed.startTime.addingTimeInterval(intervalMinutes * 60)
         return nextTime.shortTime
     }
 

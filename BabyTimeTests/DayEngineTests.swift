@@ -409,6 +409,93 @@ struct FeedStateTests {
     }
 }
 
+// MARK: - Custom Feed Interval Tests
+
+@Suite("DayEngine — Custom Feed Interval")
+struct CustomFeedIntervalTests {
+
+    let now = Calendar.current.date(
+        from: DateComponents(year: 2026, month: 2, day: 11, hour: 14, minute: 0)
+    )!
+
+    @Test("Default interval used when customFeedIntervalMinutes is 0")
+    func defaultInterval() {
+        let baby = makeBaby(ageDays: 90, referenceDate: now) // 3-4mo: 150...210
+        let feed = makeFeed(minutesAgo: 125, referenceDate: now)
+
+        let snapshot = DayEngine.snapshot(
+            baby: baby, feeds: [feed], sleeps: [], now: now
+        )
+
+        // 125 min, 80% of 150 = 120 → approaching (uses default 150...210)
+        if case .approaching(let mins, let range) = snapshot.feedState {
+            #expect(mins == 125)
+            #expect(range == 150...210)
+        } else {
+            Issue.record("Expected approaching, got \(snapshot.feedState)")
+        }
+    }
+
+    @Test("Custom 120-min interval overrides AgeTable default")
+    func customIntervalOverride() {
+        let baby = makeBaby(ageDays: 90, referenceDate: now)
+        baby.customFeedIntervalMinutes = 120 // 2 hours
+
+        // 100 min ago: 80% of 120 = 96 → approaching with custom range
+        let feed = makeFeed(minutesAgo: 100, referenceDate: now)
+
+        let snapshot = DayEngine.snapshot(
+            baby: baby, feeds: [feed], sleeps: [], now: now
+        )
+
+        if case .approaching(let mins, let range) = snapshot.feedState {
+            #expect(mins == 100)
+            #expect(range == 120...120)
+        } else {
+            Issue.record("Expected approaching with custom interval, got \(snapshot.feedState)")
+        }
+    }
+
+    @Test("Custom interval: ready when past custom threshold")
+    func customIntervalReady() {
+        let baby = makeBaby(ageDays: 90, referenceDate: now)
+        baby.customFeedIntervalMinutes = 120
+
+        // 130 min ago: past 120 → ready
+        let feed = makeFeed(minutesAgo: 130, referenceDate: now)
+
+        let snapshot = DayEngine.snapshot(
+            baby: baby, feeds: [feed], sleeps: [], now: now
+        )
+
+        if case .ready(let mins, let range) = snapshot.feedState {
+            #expect(mins == 130)
+            #expect(range == 120...120)
+        } else {
+            Issue.record("Expected ready with custom interval, got \(snapshot.feedState)")
+        }
+    }
+
+    @Test("Custom interval: recentlyFed when well within interval")
+    func customIntervalRecentlyFed() {
+        let baby = makeBaby(ageDays: 90, referenceDate: now)
+        baby.customFeedIntervalMinutes = 120
+
+        // 60 min ago: well under 80% of 120 (96) → recentlyFed
+        let feed = makeFeed(minutesAgo: 60, referenceDate: now)
+
+        let snapshot = DayEngine.snapshot(
+            baby: baby, feeds: [feed], sleeps: [], now: now
+        )
+
+        if case .recentlyFed(let mins) = snapshot.feedState {
+            #expect(mins == 60)
+        } else {
+            Issue.record("Expected recentlyFed, got \(snapshot.feedState)")
+        }
+    }
+}
+
 // MARK: - Nap Cutoff Tests
 
 @Suite("DayEngine — Nap Cutoff")

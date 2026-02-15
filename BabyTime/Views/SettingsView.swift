@@ -98,6 +98,19 @@ struct SettingsView: View {
                 .labelsHidden()
             }
 
+            LabeledField(label: "Feed Every") {
+                Picker("", selection: feedIntervalBinding(baby)) {
+                    Text("Age default").tag(0)
+                    Text("1.5 hours").tag(90)
+                    Text("2 hours").tag(120)
+                    Text("2.5 hours").tag(150)
+                    Text("3 hours").tag(180)
+                    Text("3.5 hours").tag(210)
+                    Text("4 hours").tag(240)
+                }
+                .labelsHidden()
+            }
+
             LabeledField(label: "Dream Feed") {
                 HStack {
                     Toggle("", isOn: Binding(
@@ -197,6 +210,13 @@ struct SettingsView: View {
     }
 
     // MARK: - Time Bindings
+
+    private func feedIntervalBinding(_ baby: Baby) -> Binding<Int> {
+        Binding(
+            get: { baby.customFeedIntervalMinutes },
+            set: { baby.customFeedIntervalMinutes = $0 }
+        )
+    }
 
     private func bedtimeBinding(_ baby: Baby) -> Binding<Date> {
         Binding(

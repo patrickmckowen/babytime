@@ -179,7 +179,7 @@ struct SleepCard: View {
             mode: .awake(
                 label: "Awake for",
                 duration: "1h 25m",
-                detail: "Last slept at 11:15 AM \u{00B7} 45m"
+                detail: "Wake window 1h 15m\u{2013}1h 30m"
             )
         )
         .padding(.horizontal, BTSpacing.pageMargin)

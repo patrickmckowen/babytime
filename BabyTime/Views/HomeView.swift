@@ -53,7 +53,7 @@ struct HomeView: View {
                 }
                 .padding(.top, BTSpacing.photoToCard)
                 .padding(.horizontal, BTSpacing.pageMargin)
-                .padding(.bottom, 40)
+                .padding(.bottom, BTSpacing.pageMargin)
             }
         }
         .background(Color.btBackground)

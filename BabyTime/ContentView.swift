@@ -19,6 +19,7 @@ struct ContentView: View {
     @State private var showSettings = false
     @State private var selectedPhoto: PhotosPickerItem?
     @State private var showPhotoPicker = false
+    @State private var showLog = false
 
     var body: some View {
         NavigationStack {
@@ -29,11 +30,15 @@ struct ContentView: View {
                         onBottleTap: { showBottleSheet = true },
                         onSleepTap: { showSleepSheet = true },
                         onPhotoTap: { showPhotoPicker = true },
-                        onSettingsTap: { showSettings = true }
+                        onSettingsTap: { showSettings = true },
+                        onLogTap: { showLog = true }
                     )
                 } else {
                     WelcomeView()
                 }
+            }
+            .navigationDestination(isPresented: $showLog) {
+                ActivityLogView()
             }
         }
         .toolbar {

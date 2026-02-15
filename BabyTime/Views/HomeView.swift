@@ -16,6 +16,7 @@ struct HomeView: View {
     var onSleepTap: (() -> Void)?
     var onPhotoTap: (() -> Void)?
     var onSettingsTap: (() -> Void)?
+    var onLogTap: (() -> Void)?
 
     var body: some View {
         ScrollView {
@@ -25,7 +26,8 @@ struct HomeView: View {
                     babyName: activityManager.babyName,
                     photoData: activityManager.babyPhotoData,
                     onPhotoTap: onPhotoTap,
-                    onSettingsTap: onSettingsTap
+                    onSettingsTap: onSettingsTap,
+                    onLogTap: onLogTap
                 )
 
                 // Cards section

@@ -12,8 +12,12 @@ struct BottleSheetView: View {
     @Environment(ActivityManager.self) private var activityManager
     @Environment(\.dismiss) private var dismiss
 
+    var editingEvent: FeedEvent?
+
     @State private var amountOz: Double = 4.0
     @State private var selectedTime: Date = Date()
+
+    private var isEditing: Bool { editingEvent != nil }
 
     var body: some View {
         NavigationStack {
@@ -36,8 +40,14 @@ struct BottleSheetView: View {
             .padding(.horizontal, BTSpacing.pageMargin)
             .padding(.bottom, BTSpacing.pageMargin)
             .background(Color.btBackground)
-            .navigationTitle("Bottle")
+            .navigationTitle(isEditing ? "Edit Bottle" : "Bottle")
             .navigationBarTitleDisplayMode(.inline)
+        }
+        .onAppear {
+            if let event = editingEvent {
+                amountOz = event.amountOz
+                selectedTime = event.startTime
+            }
         }
     }
 
@@ -157,7 +167,11 @@ struct BottleSheetView: View {
 
             // Save
             Button {
-                activityManager.saveBottle(amountOz: amountOz, at: selectedTime)
+                if let event = editingEvent {
+                    activityManager.updateFeedEvent(event, amountOz: amountOz, at: selectedTime)
+                } else {
+                    activityManager.saveBottle(amountOz: amountOz, at: selectedTime)
+                }
                 dismiss()
             } label: {
                 Text("Save")

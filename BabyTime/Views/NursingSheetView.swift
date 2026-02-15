@@ -14,6 +14,8 @@ struct NursingSheetView: View {
     @Environment(ActivityManager.self) private var activityManager
     @Environment(\.dismiss) private var dismiss
 
+    var editingEvent: FeedEvent?
+
     // Draft times for manual entry (before any SwiftData event exists)
     @State private var draftStartTime: Date?
     @State private var draftEndTime: Date?
@@ -21,21 +23,27 @@ struct NursingSheetView: View {
     // Cooldown: suppresses timer toggle briefly after a DatePicker tap
     @State private var pickerInteractionDate: Date?
 
-    // Effective times: event takes precedence over draft
+    private var isEditing: Bool { editingEvent != nil }
+
+    // Effective times: editing event → active timer event → draft
     private var effectiveStartTime: Date? {
-        activityManager.nursingStartTime ?? draftStartTime
+        if isEditing { return draftStartTime }
+        return activityManager.nursingStartTime ?? draftStartTime
     }
 
     private var effectiveEndTime: Date? {
-        activityManager.nursingEndTime ?? draftEndTime
+        if isEditing { return draftEndTime }
+        return activityManager.nursingEndTime ?? draftEndTime
     }
 
     private var canSave: Bool {
-        activityManager.hasNursingSession || (draftStartTime != nil && draftEndTime != nil)
+        if isEditing { return draftStartTime != nil && draftEndTime != nil }
+        return activityManager.hasNursingSession || (draftStartTime != nil && draftEndTime != nil)
     }
 
     private var canReset: Bool {
-        activityManager.hasNursingSession || draftStartTime != nil || draftEndTime != nil
+        if isEditing { return false }
+        return activityManager.hasNursingSession || draftStartTime != nil || draftEndTime != nil
     }
 
     private var isPickerRecentlyActive: Bool {
@@ -55,7 +63,7 @@ struct NursingSheetView: View {
                 .frame(maxWidth: .infinity)
                 .contentShape(Rectangle())
                 .onTapGesture {
-                    guard !isPickerRecentlyActive else { return }
+                    guard !isEditing, !isPickerRecentlyActive else { return }
                     toggleTimer()
                 }
 
@@ -69,7 +77,7 @@ struct NursingSheetView: View {
             .padding(.horizontal, BTSpacing.pageMargin)
             .padding(.bottom, BTSpacing.pageMargin)
             .background(Color.btBackground)
-            .navigationTitle("Nursing")
+            .navigationTitle(isEditing ? "Edit Nursing" : "Nursing")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -80,6 +88,12 @@ struct NursingSheetView: View {
                             .fontWeight(.semibold)
                     }
                 }
+            }
+        }
+        .onAppear {
+            if let event = editingEvent {
+                draftStartTime = event.startTime
+                draftEndTime = event.endTime
             }
         }
     }
@@ -135,7 +149,9 @@ struct NursingSheetView: View {
     }
 
     private var timerHintText: String {
-        if activityManager.isNursingActive {
+        if isEditing {
+            return "duration"
+        } else if activityManager.isNursingActive {
             return "Tap to stop"
         } else if activityManager.hasNursingSession {
             return "Tap to resume"
@@ -188,10 +204,10 @@ struct NursingSheetView: View {
                     displayedComponents: [.hourAndMinute]
                 )
                 .labelsHidden()
-                .disabled(activityManager.isNursingActive)
-                .opacity(activityManager.isNursingActive ? 0.0 : 1.0)
+                .disabled(!isEditing && activityManager.isNursingActive)
+                .opacity(!isEditing && activityManager.isNursingActive ? 0.0 : 1.0)
                 .overlay {
-                    if activityManager.isNursingActive {
+                    if !isEditing && activityManager.isNursingActive {
                         Text("—")
                             .font(.subheadline.weight(.medium))
                             .foregroundStyle(Color.btTextSecondary.opacity(0.4))
@@ -199,7 +215,7 @@ struct NursingSheetView: View {
                     }
                 }
                 .simultaneousGesture(TapGesture().onEnded {
-                    guard !activityManager.isNursingActive else { return }
+                    guard isEditing || !activityManager.isNursingActive else { return }
                     pickerInteractionDate = Date()
                 })
             }
@@ -218,7 +234,9 @@ struct NursingSheetView: View {
         Binding(
             get: { effectiveStartTime ?? Date() },
             set: { newValue in
-                if activityManager.hasNursingSession {
+                if isEditing {
+                    draftStartTime = newValue
+                } else if activityManager.hasNursingSession {
                     activityManager.nursingStartTime = newValue
                 } else {
                     draftStartTime = newValue
@@ -231,7 +249,9 @@ struct NursingSheetView: View {
         Binding(
             get: { effectiveEndTime ?? Date() },
             set: { newValue in
-                if activityManager.hasNursingSession {
+                if isEditing {
+                    draftEndTime = newValue
+                } else if activityManager.hasNursingSession {
                     activityManager.nursingEndTime = newValue
                 } else {
                     draftEndTime = newValue
@@ -245,11 +265,15 @@ struct NursingSheetView: View {
     private var actionButtons: some View {
         HStack(spacing: 14) {
             Button {
-                activityManager.resetNursing()
-                draftStartTime = nil
-                draftEndTime = nil
+                if isEditing {
+                    dismiss()
+                } else {
+                    activityManager.resetNursing()
+                    draftStartTime = nil
+                    draftEndTime = nil
+                }
             } label: {
-                Text("Reset")
+                Text(isEditing ? "Cancel" : "Reset")
                     .font(BTTypography.label)
                     .tracking(BTTracking.label)
                     .foregroundStyle(Color.btTextSecondary)
@@ -259,10 +283,12 @@ struct NursingSheetView: View {
                     .clipShape(Capsule())
                     .cardShadow()
             }
-            .disabled(!canReset)
+            .disabled(!isEditing && !canReset)
 
             Button {
-                if activityManager.hasNursingSession {
+                if let event = editingEvent, let start = draftStartTime, let end = draftEndTime {
+                    activityManager.updateNursingEvent(event, startTime: start, endTime: end, side: event.side)
+                } else if activityManager.hasNursingSession {
                     activityManager.saveNursing()
                 } else if let start = draftStartTime, let end = draftEndTime {
                     activityManager.saveNursingManual(startTime: start, endTime: end)

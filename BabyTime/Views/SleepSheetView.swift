@@ -14,6 +14,8 @@ struct SleepSheetView: View {
     @Environment(ActivityManager.self) private var activityManager
     @Environment(\.dismiss) private var dismiss
 
+    var editingEvent: SleepEvent?
+
     // Draft times for manual entry (before any SwiftData event exists)
     @State private var draftStartTime: Date?
     @State private var draftEndTime: Date?
@@ -21,21 +23,27 @@ struct SleepSheetView: View {
     // Cooldown: suppresses timer toggle briefly after a DatePicker tap
     @State private var pickerInteractionDate: Date?
 
-    // Effective times: event takes precedence over draft
+    private var isEditing: Bool { editingEvent != nil }
+
+    // Effective times: editing event → active timer event → draft
     private var effectiveStartTime: Date? {
-        activityManager.sleepStartTime ?? draftStartTime
+        if isEditing { return draftStartTime }
+        return activityManager.sleepStartTime ?? draftStartTime
     }
 
     private var effectiveEndTime: Date? {
-        activityManager.sleepEndTime ?? draftEndTime
+        if isEditing { return draftEndTime }
+        return activityManager.sleepEndTime ?? draftEndTime
     }
 
     private var canSave: Bool {
-        activityManager.hasSleepSession || (draftStartTime != nil && draftEndTime != nil)
+        if isEditing { return draftStartTime != nil && draftEndTime != nil }
+        return activityManager.hasSleepSession || (draftStartTime != nil && draftEndTime != nil)
     }
 
     private var canReset: Bool {
-        activityManager.hasSleepSession || draftStartTime != nil || draftEndTime != nil
+        if isEditing { return false }
+        return activityManager.hasSleepSession || draftStartTime != nil || draftEndTime != nil
     }
 
     private var isPickerRecentlyActive: Bool {
@@ -55,7 +63,7 @@ struct SleepSheetView: View {
                 .frame(maxWidth: .infinity)
                 .contentShape(Rectangle())
                 .onTapGesture {
-                    guard !isPickerRecentlyActive else { return }
+                    guard !isEditing, !isPickerRecentlyActive else { return }
                     toggleTimer()
                 }
 
@@ -69,7 +77,7 @@ struct SleepSheetView: View {
             .padding(.horizontal, BTSpacing.pageMargin)
             .padding(.bottom, BTSpacing.pageMargin)
             .background(Color.btBackground)
-            .navigationTitle("Sleep")
+            .navigationTitle(isEditing ? "Edit Sleep" : "Sleep")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -80,6 +88,12 @@ struct SleepSheetView: View {
                             .fontWeight(.semibold)
                     }
                 }
+            }
+        }
+        .onAppear {
+            if let event = editingEvent {
+                draftStartTime = event.startTime
+                draftEndTime = event.endTime
             }
         }
     }
@@ -138,7 +152,9 @@ struct SleepSheetView: View {
     }
 
     private var timerHintText: String {
-        if activityManager.isSleepActive {
+        if isEditing {
+            return "duration"
+        } else if activityManager.isSleepActive {
             return "Tap to stop"
         } else if activityManager.hasSleepSession {
             return "Tap to resume"
@@ -191,10 +207,10 @@ struct SleepSheetView: View {
                     displayedComponents: [.hourAndMinute]
                 )
                 .labelsHidden()
-                .disabled(activityManager.isSleepActive)
-                .opacity(activityManager.isSleepActive ? 0.0 : 1.0)
+                .disabled(!isEditing && activityManager.isSleepActive)
+                .opacity(!isEditing && activityManager.isSleepActive ? 0.0 : 1.0)
                 .overlay {
-                    if activityManager.isSleepActive {
+                    if !isEditing && activityManager.isSleepActive {
                         Text("—")
                             .font(.subheadline.weight(.medium))
                             .foregroundStyle(Color.btTextSecondary.opacity(0.4))
@@ -202,7 +218,7 @@ struct SleepSheetView: View {
                     }
                 }
                 .simultaneousGesture(TapGesture().onEnded {
-                    guard !activityManager.isSleepActive else { return }
+                    guard isEditing || !activityManager.isSleepActive else { return }
                     pickerInteractionDate = Date()
                 })
             }
@@ -221,7 +237,9 @@ struct SleepSheetView: View {
         Binding(
             get: { effectiveStartTime ?? Date() },
             set: { newValue in
-                if activityManager.hasSleepSession {
+                if isEditing {
+                    draftStartTime = newValue
+                } else if activityManager.hasSleepSession {
                     activityManager.sleepStartTime = newValue
                 } else {
                     draftStartTime = newValue
@@ -234,7 +252,9 @@ struct SleepSheetView: View {
         Binding(
             get: { effectiveEndTime ?? Date() },
             set: { newValue in
-                if activityManager.hasSleepSession {
+                if isEditing {
+                    draftEndTime = newValue
+                } else if activityManager.hasSleepSession {
                     activityManager.sleepEndTime = newValue
                 } else {
                     draftEndTime = newValue
@@ -248,11 +268,15 @@ struct SleepSheetView: View {
     private var actionButtons: some View {
         HStack(spacing: 14) {
             Button {
-                activityManager.resetSleep()
-                draftStartTime = nil
-                draftEndTime = nil
+                if isEditing {
+                    dismiss()
+                } else {
+                    activityManager.resetSleep()
+                    draftStartTime = nil
+                    draftEndTime = nil
+                }
             } label: {
-                Text("Reset")
+                Text(isEditing ? "Cancel" : "Reset")
                     .font(BTTypography.label)
                     .tracking(BTTracking.label)
                     .foregroundStyle(Color.btTextSecondary)
@@ -262,10 +286,12 @@ struct SleepSheetView: View {
                     .clipShape(Capsule())
                     .cardShadow()
             }
-            .disabled(!canReset)
+            .disabled(!isEditing && !canReset)
 
             Button {
-                if activityManager.hasSleepSession {
+                if let event = editingEvent, let start = draftStartTime, let end = draftEndTime {
+                    activityManager.updateSleepEvent(event, startTime: start, endTime: end)
+                } else if activityManager.hasSleepSession {
                     activityManager.saveSleep()
                 } else if let start = draftStartTime, let end = draftEndTime {
                     activityManager.saveSleepManual(startTime: start, endTime: end)

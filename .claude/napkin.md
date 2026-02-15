@@ -12,6 +12,8 @@
 | 2026-02-11 | self | Introduced naming conflicts (Baby, BottleSource, NursingSide) between new SwiftData models and old structs | When adding new types that share names with existing ones, rename old types first (Legacy prefix) before creating new ones |
 | 2026-02-12 | self | saveSleep()/saveNursing() cleared active reference without setting endTime — orphaned active event in SwiftData | Any "finalize" action on a persist-on-start timer MUST set endTime before clearing the reference |
 | 2026-02-14 | user | "Awake for" card showed stale value (26m instead of 82m) — DayEngine.snapshot bakes wakeMinutes as static Int, never refreshed | Time-dependent display values need live updates via TimelineView, not static snapshot values |
+| 2026-02-14 | self | Complex SwiftUI body with existential types `(any Protocol)?` + nested ForEach/Section caused "unable to type-check" | Break up body into extracted computed properties/methods; use concrete enum instead of protocol existential; use List not ScrollView for swipeActions |
+| 2026-02-14 | user | Bottle source (breastMilk vs formula) not used in display | Don't include "of Breast Milk" in activity descriptions |
 
 ## User Preferences
 - Ask questions, don't guess or assume
@@ -39,6 +41,9 @@
 - Draft state pattern for timer sheets: use `@State` local vars for pre-event times, `effectiveTime` computed props that prefer event over draft, route bindings to correct source via `hasSleepSession` check
 - Timer resume: add `resumeSleep()` that clears endTime, don't reset+restart. Only Reset button should delete the event
 - For time-dependent display values: expose reference Date on snapshot, compute elapsed time at the view layer via TimelineView(.periodic), not in the engine snapshot
+- Edit mode on existing sheets: add optional `editingEvent` param, `isEditing` computed prop, seed `@State` drafts in `.onAppear`, branch save/reset logic on isEditing
+- LogEntry enum wrapping FeedEvent/SleepEvent works well for unified list display with PersistentIdentifier as Identifiable id
+- `.swipeActions` requires List context, not LazyVStack — use List with .plain style + .scrollContentBackground(.hidden) for custom backgrounds
 
 ## Patterns That Don't Work
 - Glob can't find directories (like .xcodeproj) - it only finds files
@@ -52,8 +57,9 @@
 - CODE_SIGN_ENTITLEMENTS = BabyTime/BabyTime.entitlements (relative to project root)
 - Implementation guide: docs/IMPLEMENTATION_GUIDE.md — read this first in new sessions
 - Phase 1+2 complete: SwiftData models + DayEngine + 46 tests passing
-- Phase 3+4 complete: Settings screen + UI wiring (Session 2)
+- Phase 3+4 complete: Settings screen + UI wiring
+- Phase 5 complete: ActivityLogView — grouped-by-day, tap to edit, swipe to delete, calendar button in BabyPhotoHeader
+- Not using bottle source (breastMilk vs formula) in display — user preference
 - Deferred: TodaySummaryCard, LogView, TimelineView still use legacy types
 - Deferred: MockData.swift and Activity.swift legacy types not yet removed
-- Next: Session 3 = Run tests, verify on simulator, cleanup legacy types, preview gallery
-- All changes uncommitted on `feature/bottle-sheet` branch
+- Branch: `feature/custom-feed-interval`

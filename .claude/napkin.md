@@ -14,6 +14,7 @@
 | 2026-02-14 | user | "Awake for" card showed stale value (26m instead of 82m) — DayEngine.snapshot bakes wakeMinutes as static Int, never refreshed | Time-dependent display values need live updates via TimelineView, not static snapshot values |
 | 2026-02-14 | self | Complex SwiftUI body with existential types `(any Protocol)?` + nested ForEach/Section caused "unable to type-check" | Break up body into extracted computed properties/methods; use concrete enum instead of protocol existential; use List not ScrollView for swipeActions |
 | 2026-02-14 | user | Bottle source (breastMilk vs formula) not used in display | Don't include "of Breast Milk" in activity descriptions |
+| 2026-02-15 | self | DatePicker shows `?? Date()` default but `@State` draft stays nil until user interacts | When one draft time is set, auto-initialize the companion to `Date()` so displayed value matches internal state |
 
 ## User Preferences
 - Ask questions, don't guess or assume

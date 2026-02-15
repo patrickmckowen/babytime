@@ -75,7 +75,7 @@ enum DayEngine {
             ageTable: ageTable,
             wakeTime: wakeTime,
             wakeReference: wakeReference,
-            lastFeedReference: latestCompletedFeed(feeds)?.startTime
+            lastFeedReference: latestCompletedFeed(feeds)?.endTime ?? latestCompletedFeed(feeds)?.startTime
         )
     }
 

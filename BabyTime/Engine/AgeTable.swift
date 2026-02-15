@@ -32,12 +32,15 @@ struct AgeTable: Sendable, Equatable {
         wakeWindows[wakeWindows.count - 1]
     }
 
-    /// Nursing oz-per-minute estimate for this age bracket
-    var nursingOzPerMinute: Double {
+    /// Nursing oz-per-minute estimate for this age bracket.
+    /// For 60+ days: higher rate before 8am (fuller breast after overnight rest).
+    func nursingOzPerMinute(at sessionStart: Date) -> Double {
         switch ageRangeDays.lowerBound {
         case 0..<30: return 0.1
         case 30..<60: return 0.15
-        default: return 0.2
+        default:
+            let hour = Calendar.current.component(.hour, from: sessionStart)
+            return hour < 8 ? 0.5 : 0.25
         }
     }
 

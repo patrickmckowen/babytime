@@ -518,3 +518,62 @@ struct NapCutoffTests {
         #expect(cutoff == expectedCutoff)
     }
 }
+
+// MARK: - Nursing Oz Rate Tests
+
+@Suite("AgeTable — Time-Based Nursing Oz Rate")
+struct NursingOzRateTests {
+
+    @Test("60+ days, early morning session (before 8am) → 0.5 oz/min")
+    func morningRate() {
+        let table = AgeTable.forAge(days: 90) // 3-4 months
+        let morning = Calendar.current.date(
+            from: DateComponents(year: 2026, month: 2, day: 15, hour: 6, minute: 30)
+        )!
+        #expect(table.nursingOzPerMinute(at: morning) == 0.5)
+    }
+
+    @Test("60+ days, after 8am → 0.25 oz/min")
+    func afternoonRate() {
+        let table = AgeTable.forAge(days: 90)
+        let afternoon = Calendar.current.date(
+            from: DateComponents(year: 2026, month: 2, day: 15, hour: 9, minute: 0)
+        )!
+        #expect(table.nursingOzPerMinute(at: afternoon) == 0.25)
+    }
+
+    @Test("60+ days, exactly 8am → 0.25 oz/min")
+    func boundaryAt8am() {
+        let table = AgeTable.forAge(days: 90)
+        let eightAM = Calendar.current.date(
+            from: DateComponents(year: 2026, month: 2, day: 15, hour: 8, minute: 0)
+        )!
+        #expect(table.nursingOzPerMinute(at: eightAM) == 0.25)
+    }
+
+    @Test("Under 30 days → 0.1 oz/min regardless of time")
+    func newbornRate() {
+        let table = AgeTable.forAge(days: 14)
+        let morning = Calendar.current.date(
+            from: DateComponents(year: 2026, month: 2, day: 15, hour: 7, minute: 0)
+        )!
+        let afternoon = Calendar.current.date(
+            from: DateComponents(year: 2026, month: 2, day: 15, hour: 14, minute: 0)
+        )!
+        #expect(table.nursingOzPerMinute(at: morning) == 0.1)
+        #expect(table.nursingOzPerMinute(at: afternoon) == 0.1)
+    }
+
+    @Test("30-60 days → 0.15 oz/min regardless of time")
+    func oneMonthRate() {
+        let table = AgeTable.forAge(days: 45)
+        let morning = Calendar.current.date(
+            from: DateComponents(year: 2026, month: 2, day: 15, hour: 7, minute: 0)
+        )!
+        let afternoon = Calendar.current.date(
+            from: DateComponents(year: 2026, month: 2, day: 15, hour: 14, minute: 0)
+        )!
+        #expect(table.nursingOzPerMinute(at: morning) == 0.15)
+        #expect(table.nursingOzPerMinute(at: afternoon) == 0.15)
+    }
+}

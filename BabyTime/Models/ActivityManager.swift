@@ -495,7 +495,7 @@ final class ActivityManager {
     var totalIntakeOz: Double {
         guard let baby else { return 0 }
         let table = AgeTable.forAge(days: baby.ageInDays)
-        return todayFeeds.reduce(0) { $0 + $1.estimatedOz(nursingOzPerMinute: table.nursingOzPerMinute) }
+        return todayFeeds.reduce(0) { $0 + $1.estimatedOz(nursingOzPerMinute: table.nursingOzPerMinute(at: $1.startTime)) }
     }
 
     var totalSleepMinutes: Int {

@@ -38,11 +38,11 @@ struct ContentView: View {
             .safeAreaInset(edge: .bottom) {
                 if activityManager.baby != nil {
                     HStack {
-                        // Left: Calendar → Activity Log
+                        // Left: Settings
                         Button {
-                            showLog = true
+                            showSettings = true
                         } label: {
-                            Image(systemName: "calendar")
+                            Image(systemName: "slider.horizontal.3")
                                 .font(.body)
                                 .foregroundStyle(Color.btTextPrimary)
                                 .frame(width: 44, height: 44)
@@ -84,11 +84,11 @@ struct ContentView: View {
 
                         Spacer()
 
-                        // Right: Settings
+                        // Right: Calendar → Activity Log
                         Button {
-                            showSettings = true
+                            showLog = true
                         } label: {
-                            Image(systemName: "slider.horizontal.3")
+                            Image(systemName: "calendar")
                                 .font(.body)
                                 .foregroundStyle(Color.btTextPrimary)
                                 .frame(width: 44, height: 44)

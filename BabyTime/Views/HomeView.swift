@@ -46,8 +46,12 @@ struct HomeView: View {
                         averageOz: activityManager.averageOzFormatted,
                         wakeTime: activityManager.hasWakeTime ? activityManager.wakeTimeFormatted : nil,
                         bedtimeTime: activityManager.bedtimeFormatted,
+                        actualBedtime: activityManager.actualBedtimeFormatted,
                         onWakeTimeChanged: { time in
                             activityManager.setWakeTime(time)
+                        },
+                        onBedtimeChanged: { time in
+                            activityManager.updateBedtime(time)
                         }
                     )
                 }
@@ -77,12 +81,12 @@ struct HomeView: View {
             )
         } else if let snapshot = activityManager.snapshot,
                   let feedRef = snapshot.lastFeedReference {
-            // Live-update "last fed X ago" and "next feed" every 60 seconds
+            // Live-update "last fed X ago" every 60 seconds
             SwiftUI.TimelineView(.periodic(from: .now, by: 60)) { context in
                 FeedCard(
                     mode: .nextFeed(
                         lastFedAgo: formatMinutes(Int(context.date.timeIntervalSince(feedRef) / 60)),
-                        offerDetail: "Offer \(activityManager.offerAmountOz)oz by \(nextFeedTimeString(feedRef: feedRef, now: context.date))"
+                        offerDetail: feedOfferDetail(feedRef: feedRef, now: context.date)
                     ),
                     onTap: nil
                 )
@@ -91,7 +95,7 @@ struct HomeView: View {
             FeedCard(
                 mode: .nextFeed(
                     lastFedAgo: activityManager.timeSinceLastFeedDuration,
-                    offerDetail: "Offer \(activityManager.offerAmountOz)oz by \(activityManager.nextFeedTimeFormatted)"
+                    offerDetail: feedOfferDetail(feedRef: nil, now: Date())
                 ),
                 onTap: nil
             )
@@ -119,12 +123,23 @@ struct HomeView: View {
                         }
                     )
                 }
+            } else if case .asleepForNight = snapshot.dayState {
+                // Live-update nighttime sleep duration every 60 seconds
+                SwiftUI.TimelineView(.periodic(from: .now, by: 60)) { context in
+                    SleepCard(
+                        mode: sleepCardMode(from: snapshot, now: context.date),
+                        onTap: nil
+                    )
+                }
             } else {
                 SleepCard(
                     mode: sleepCardMode(from: snapshot),
                     onTap: nil,
                     onWakeTimeSubmit: { time in
                         activityManager.setWakeTime(time)
+                    },
+                    onBedtimeSubmit: { time in
+                        activityManager.logBedtime(time)
                     }
                 )
             }
@@ -198,11 +213,18 @@ struct HomeView: View {
                 detail: "No more naps today"
             )
 
-        case .bedtimeWindow(let mins):
-            return .awake(
-                label: "Bedtime in",
-                duration: formatMinutes(mins),
-                detail: ""
+        case .bedtimeWindow:
+            return .bedtimePrompt(babyName: activityManager.babyName)
+
+        case .asleepForNight(let mins):
+            let liveMins: Int = {
+                guard let now, let nightSleep = activityManager.todayNightSleep else { return mins }
+                return max(0, Int(now.timeIntervalSince(nightSleep.startTime) / 60))
+            }()
+            return .sleeping(
+                label: "Sleeping",
+                duration: formatMinutes(liveMins),
+                detail: "Fell asleep at \(activityManager.todayNightSleep?.startTime.shortTime ?? "--")"
             )
         }
     }
@@ -215,6 +237,19 @@ struct HomeView: View {
         } else {
             return ""
         }
+    }
+
+    private func feedOfferDetail(feedRef: Date?, now: Date) -> String {
+        // When asleep for the night with dream feed enabled, show dream feed time
+        if activityManager.isAsleepForNight,
+           let dreamFeedTime = activityManager.dreamFeedTimeFormatted {
+            return "Dream feed at \(dreamFeedTime)"
+        }
+        // Standard offer detail
+        if let feedRef {
+            return "Offer \(activityManager.offerAmountOz)oz by \(nextFeedTimeString(feedRef: feedRef, now: now))"
+        }
+        return "Offer \(activityManager.offerAmountOz)oz by \(activityManager.nextFeedTimeFormatted)"
     }
 
     private func nextFeedTimeString(feedRef: Date, now: Date) -> String {

@@ -18,10 +18,14 @@ struct TodaySummaryCard: View {
     let averageOz: String
     var wakeTime: String? = nil
     var bedtimeTime: String? = nil
+    var actualBedtime: String? = nil
     var onWakeTimeChanged: ((Date) -> Void)? = nil
+    var onBedtimeChanged: ((Date) -> Void)? = nil
 
     @State private var isEditingWakeTime = false
     @State private var editWakeTime = Date()
+    @State private var isEditingBedtime = false
+    @State private var editBedtime = Date()
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -85,13 +89,25 @@ struct TodaySummaryCard: View {
             )
 
             // Bedtime row
-            if let bedtimeTime {
+            if actualBedtime != nil || bedtimeTime != nil {
                 Rectangle()
                     .fill(Color.btDivider)
                     .frame(height: 1)
                     .padding(.vertical, BTSpacing.rowDividerPadding)
 
-                BedtimeRow(bedtime: bedtimeTime)
+                if actualBedtime != nil {
+                    BedtimeRow(
+                        bedtime: actualBedtime ?? "--",
+                        isEditing: $isEditingBedtime,
+                        editTime: $editBedtime,
+                        onConfirm: {
+                            onBedtimeChanged?(editBedtime)
+                            isEditingBedtime = false
+                        }
+                    )
+                } else {
+                    BedtimeRow(bedtime: bedtimeTime ?? "--")
+                }
             }
         }
         .padding(.top, BTSpacing.cardPaddingTop)
@@ -221,6 +237,11 @@ private struct WakeTimeRow: View {
 
 private struct BedtimeRow: View {
     let bedtime: String
+    var isEditing: Binding<Bool>? = nil
+    var editTime: Binding<Date>? = nil
+    var onConfirm: (() -> Void)? = nil
+
+    private var isEditable: Bool { isEditing != nil }
 
     var body: some View {
         HStack(spacing: BTSpacing.iconToStat) {
@@ -233,19 +254,47 @@ private struct BedtimeRow: View {
                         .foregroundStyle(Color.btSleepAccent)
                 }
 
-            VStack(alignment: .leading, spacing: 2) {
-                Text("Bedtime")
-                    .font(BTTypography.statLabel)
-                    .tracking(BTTracking.statLabel)
-                    .foregroundStyle(Color.btTextMuted)
+            if let isEditing, isEditing.wrappedValue, let editTime {
+                DatePicker(
+                    "",
+                    selection: editTime,
+                    displayedComponents: .hourAndMinute
+                )
+                .labelsHidden()
 
-                Text(bedtime)
-                    .font(BTTypography.statValue)
-                    .tracking(BTTracking.statValue)
-                    .foregroundStyle(Color.btTextPrimary)
+                Spacer()
+
+                Button {
+                    onConfirm?()
+                } label: {
+                    Image(systemName: "checkmark")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .frame(width: 32, height: 32)
+                        .background(Color.btSleepAccent)
+                        .clipShape(Circle())
+                }
+            } else {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Bedtime")
+                        .font(BTTypography.statLabel)
+                        .tracking(BTTracking.statLabel)
+                        .foregroundStyle(Color.btTextMuted)
+
+                    Text(bedtime)
+                        .font(BTTypography.statValue)
+                        .tracking(BTTracking.statValue)
+                        .foregroundStyle(Color.btTextPrimary)
+                }
+
+                Spacer()
             }
-
-            Spacer()
+        }
+        .contentShape(Rectangle())
+        .onTapGesture {
+            if isEditable, let isEditing, !isEditing.wrappedValue {
+                isEditing.wrappedValue = true
+            }
         }
     }
 }

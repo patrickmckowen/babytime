@@ -219,7 +219,7 @@ struct SleepCard: View {
             mode: .awake(
                 label: "Awake for",
                 duration: "1h 25m",
-                detail: "Wake window 1h 15m\u{2013}1h 30m"
+                detail: "Nap by 11:30 AM"
             )
         )
         .padding(.horizontal, BTSpacing.pageMargin)
@@ -233,7 +233,7 @@ struct SleepCard: View {
             mode: .awake(
                 label: "Nap window open",
                 duration: "1h 25m",
-                detail: "Window 1h 15m\u{2013}1h 30m"
+                detail: "Nap by 11:30 AM"
             )
         )
         .padding(.horizontal, BTSpacing.pageMargin)

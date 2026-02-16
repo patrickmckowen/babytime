@@ -168,21 +168,21 @@ struct HomeView: View {
             return .awake(
                 label: "Awake for",
                 duration: formatMinutes(liveWakeMinutes ?? mins),
-                detail: "Wake window \(formatMinutes(range.lowerBound))\u{2013}\(formatMinutes(range.upperBound))"
+                detail: "Nap by \(napByTimeString(snapshot: snapshot, range: range))"
             )
 
         case .awakeApproaching(let mins, let range):
             return .awake(
                 label: "Nap window open",
                 duration: formatMinutes(liveWakeMinutes ?? mins),
-                detail: "Window \(formatMinutes(range.lowerBound))\u{2013}\(formatMinutes(range.upperBound))"
+                detail: "Nap by \(napByTimeString(snapshot: snapshot, range: range))"
             )
 
         case .awakeBeyond(let mins, let range):
             return .awake(
                 label: "Past wake window",
                 duration: formatMinutes(liveWakeMinutes ?? mins),
-                detail: "Target was \(formatMinutes(range.upperBound))"
+                detail: "Due at \(napByTimeString(snapshot: snapshot, range: range))"
             )
 
         case .sleepingNoPressure(let mins, _):
@@ -260,6 +260,14 @@ struct HomeView: View {
             return "Now"
         }
         return nextTime.shortTime
+    }
+
+    private func napByTimeString(snapshot: DaySnapshot, range: ClosedRange<Int>) -> String {
+        guard let ref = snapshot.wakeReference else {
+            return "\(formatMinutes(range.lowerBound))\u{2013}\(formatMinutes(range.upperBound))"
+        }
+        let napBy = ref.addingTimeInterval(Double(range.upperBound) * 60)
+        return napBy.shortTime
     }
 
     private func formatMinutes(_ mins: Int) -> String {

@@ -180,9 +180,9 @@ struct HomeView: View {
 
         case .awakeBeyond(let mins, let range):
             return .awake(
-                label: "Past wake window",
+                label: "Awake for",
                 duration: formatMinutes(liveWakeMinutes ?? mins),
-                detail: "Due at \(napByTimeString(snapshot: snapshot, range: range))"
+                detail: "Wake window ended at \(napByTimeString(snapshot: snapshot, range: range))\nTry again"
             )
 
         case .sleepingNoPressure(let mins, _):

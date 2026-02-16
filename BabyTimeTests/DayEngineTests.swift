@@ -59,10 +59,11 @@ private func makeSleep(
 /// Creates an active (in-progress) sleep event
 private func makeActiveSleep(
     startedMinutesAgo: Int,
+    isNightSleep: Bool = false,
     referenceDate: Date = Date()
 ) -> SleepEvent {
     let start = referenceDate.addingTimeInterval(-Double(startedMinutesAgo) * 60)
-    return SleepEvent(startTime: start, endTime: nil)
+    return SleepEvent(startTime: start, endTime: nil, isNightSleep: isNightSleep)
 }
 
 // MARK: - Day State Tests
@@ -220,6 +221,66 @@ struct DayStateTests {
             #expect(mins == 15)
         } else {
             Issue.record("Expected bedtimeWindow, got \(snapshot.dayState)")
+        }
+    }
+
+    @Test("Asleep for the night — nighttime sleep after bedtime")
+    func asleepForNight() {
+        // 7:30 PM, baby fell asleep 30 min ago (at 7 PM bedtime)
+        let eveningNow = Calendar.current.date(
+            from: DateComponents(year: 2026, month: 2, day: 11, hour: 19, minute: 30)
+        )!
+        let baby = makeBaby(ageDays: 90, bedtimeHour: 19, referenceDate: eveningNow)
+        let feed = makeFeed(minutesAgo: 60, referenceDate: eveningNow)
+        let nightSleep = makeActiveSleep(startedMinutesAgo: 30, isNightSleep: true, referenceDate: eveningNow)
+
+        let snapshot = DayEngine.snapshot(
+            baby: baby, feeds: [feed], sleeps: [nightSleep], now: eveningNow
+        )
+
+        if case .asleepForNight(let mins) = snapshot.dayState {
+            #expect(mins == 30)
+        } else {
+            Issue.record("Expected asleepForNight, got \(snapshot.dayState)")
+        }
+    }
+
+    @Test("Nighttime sleep flag takes priority over nap sleeping states")
+    func nightSleepPriorityOverNapStates() {
+        // Even during daytime hours, isNightSleep flag drives asleepForNight
+        let baby = makeBaby(ageDays: 90, bedtimeHour: 19, referenceDate: now)
+        let feed = makeFeed(minutesAgo: 60, referenceDate: now)
+        let nightSleep = makeActiveSleep(startedMinutesAgo: 20, isNightSleep: true, referenceDate: now)
+
+        let snapshot = DayEngine.snapshot(
+            baby: baby, feeds: [feed], sleeps: [nightSleep], now: now
+        )
+
+        if case .asleepForNight(let mins) = snapshot.dayState {
+            #expect(mins == 20)
+        } else {
+            Issue.record("Expected asleepForNight (flag-driven), got \(snapshot.dayState)")
+        }
+    }
+
+    @Test("Regular nap sleep is NOT asleepForNight")
+    func regularNapNotNightSleep() {
+        let baby = makeBaby(ageDays: 90, bedtimeHour: 19, referenceDate: now)
+        let feed = makeFeed(minutesAgo: 60, referenceDate: now)
+        let nap = makeActiveSleep(startedMinutesAgo: 20, isNightSleep: false, referenceDate: now)
+
+        let snapshot = DayEngine.snapshot(
+            baby: baby, feeds: [feed], sleeps: [nap], now: now
+        )
+
+        if case .asleepForNight = snapshot.dayState {
+            Issue.record("Regular nap should not be asleepForNight, got \(snapshot.dayState)")
+        }
+        // Should be one of the sleeping nap states
+        if case .sleepingNoPressure(let mins, _) = snapshot.dayState {
+            #expect(mins == 20)
+        } else {
+            Issue.record("Expected sleepingNoPressure, got \(snapshot.dayState)")
         }
     }
 

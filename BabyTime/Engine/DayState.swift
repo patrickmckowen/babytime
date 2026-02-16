@@ -37,13 +37,16 @@ enum DayState: Equatable, Sendable {
     /// State 8: Bedtime window. Almost there.
     case bedtimeWindow(minutesToBedtime: Int)
 
+    /// State 9: Asleep for the night. Day is done.
+    case asleepForNight(sleepMinutes: Int)
+
     /// Whether this state represents an awake period that needs live duration updates.
     var isAwakeState: Bool {
         switch self {
         case .awakeEarly, .awakeApproaching, .awakeBeyond, .napWindowClosed:
             return true
         case .notStarted, .sleepingNoPressure, .sleepingApproachingCutoff,
-             .sleepingMustEnd, .bedtimeWindow:
+             .sleepingMustEnd, .bedtimeWindow, .asleepForNight:
             return false
         }
     }

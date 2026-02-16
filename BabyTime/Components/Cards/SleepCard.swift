@@ -11,6 +11,7 @@ struct SleepCard: View {
     let mode: Mode
     var onTap: (() -> Void)?
     var onWakeTimeSubmit: ((Date) -> Void)?
+    var onBedtimeSubmit: ((Date) -> Void)?
 
     enum Mode {
         /// Awake states — configurable label, duration, and detail
@@ -21,9 +22,12 @@ struct SleepCard: View {
         case sleepActive
         /// Empty state — prompt user for wake time
         case wakeTimePrompt(babyName: String)
+        /// Bedtime window — prompt user to log when baby fell asleep
+        case bedtimePrompt(babyName: String)
     }
 
     @State private var selectedWakeTime = Date()
+    @State private var selectedBedtime = Date()
 
     var body: some View {
         Group {
@@ -36,6 +40,8 @@ struct SleepCard: View {
                 sleepActiveContent
             case .wakeTimePrompt(let babyName):
                 wakeTimePromptContent(babyName: babyName)
+            case .bedtimePrompt(let babyName):
+                bedtimePromptContent(babyName: babyName)
             }
         }
         .padding(.top, BTSpacing.cardPaddingTop)
@@ -142,6 +148,40 @@ struct SleepCard: View {
         }
     }
 
+    // MARK: - Bedtime Prompt Content
+
+    private func bedtimePromptContent(babyName: String) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Text("When did \(babyName) fall asleep?")
+                .font(BTTypography.headlineSmall)
+                .tracking(BTTracking.headlineSmall)
+                .foregroundStyle(Color.btTextPrimary)
+
+            HStack {
+                DatePicker(
+                    "",
+                    selection: $selectedBedtime,
+                    displayedComponents: .hourAndMinute
+                )
+                .labelsHidden()
+
+                Spacer()
+
+                Button {
+                    onBedtimeSubmit?(selectedBedtime)
+                } label: {
+                    Image(systemName: "checkmark")
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .frame(width: 44, height: 44)
+                        .background(Color.btSleepAccent)
+                        .clipShape(Circle())
+                }
+            }
+            .padding(.top, 18)
+        }
+    }
+
     // MARK: - Sleep Active Content (live timer)
 
     @Environment(ActivityManager.self) private var activityManager
@@ -206,6 +246,17 @@ struct SleepCard: View {
         SleepCard(
             mode: .wakeTimePrompt(babyName: "Kaia"),
             onWakeTimeSubmit: { _ in }
+        )
+        .padding(.horizontal, BTSpacing.pageMargin)
+    }
+}
+
+#Preview("Bedtime Prompt") {
+    ZStack {
+        Color.btBackground.ignoresSafeArea()
+        SleepCard(
+            mode: .bedtimePrompt(babyName: "Kaia"),
+            onBedtimeSubmit: { _ in }
         )
         .padding(.horizontal, BTSpacing.pageMargin)
     }

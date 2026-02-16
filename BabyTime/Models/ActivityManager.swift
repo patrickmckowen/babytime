@@ -138,7 +138,9 @@ final class ActivityManager {
         )
     }
 
-    /// Recover in-progress events after app launch or baby switch
+    /// Recover in-progress events after app launch or baby switch.
+    /// Auto-closes stale nighttime sleeps from previous days and only
+    /// recovers nap timers (not nighttime sleep) as the active session.
     private func recoverActiveEvents() {
         guard let baby else {
             activeNursingEvent = nil
@@ -150,7 +152,15 @@ final class ActivityManager {
         activeNursingEvent = feeds.first { $0.kind == .nursing && $0.isActive }
 
         let sleeps = baby.sleepEvents ?? []
-        activeSleepEvent = sleeps.first { $0.isActive }
+
+        // Auto-close nighttime sleeps from previous days
+        let startOfDay = Calendar.current.startOfDay(for: Date())
+        for sleep in sleeps where sleep.isNightSleep && sleep.isActive && sleep.startTime < startOfDay {
+            sleep.endTime = startOfDay
+        }
+
+        // Only recover nap timers, not nighttime sleep
+        activeSleepEvent = sleeps.first { $0.isActive && !$0.isNightSleep }
     }
 
     // MARK: - Nursing Actions
@@ -370,6 +380,35 @@ final class ActivityManager {
         todayWakeEvent?.time.shortTime ?? "--"
     }
 
+    // MARK: - Bedtime Actions
+
+    func logBedtime(_ time: Date) {
+        guard let baby else { return }
+        let event = SleepEvent(startTime: time, isNightSleep: true, baby: baby)
+        modelContext.insert(event)
+        save()
+        refresh()
+    }
+
+    func updateBedtime(_ time: Date) {
+        guard let nightSleep = todayNightSleep else { return }
+        nightSleep.startTime = time
+        save()
+        refresh()
+    }
+
+    var todayNightSleep: SleepEvent? {
+        todaySleeps.first { $0.isNightSleep }
+    }
+
+    var actualBedtimeFormatted: String? {
+        todayNightSleep?.startTime.shortTime
+    }
+
+    var isAsleepForNight: Bool {
+        todayNightSleep != nil
+    }
+
     // MARK: - Persistence
 
     private func save() {
@@ -478,6 +517,18 @@ final class ActivityManager {
 
     var bedtimeFormatted: String? {
         baby?.bedtimeToday().shortTime
+    }
+
+    var dreamFeedEnabled: Bool {
+        baby?.dreamFeedEnabled ?? false
+    }
+
+    var dreamFeedTimeFormatted: String? {
+        guard let baby, baby.dreamFeedEnabled else { return nil }
+        var components = Calendar.current.dateComponents([.year, .month, .day], from: Date())
+        components.hour = baby.dreamFeedHour
+        components.minute = baby.dreamFeedMinute
+        return Calendar.current.date(from: components)?.shortTime
     }
 
     var babyPhotoData: Data? {

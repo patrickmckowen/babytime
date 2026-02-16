@@ -12,16 +12,19 @@ import SwiftData
 final class SleepEvent {
     var startTime: Date = Date()
     var endTime: Date?
+    var isNightSleep: Bool = false
 
     var baby: Baby?
 
     init(
         startTime: Date = Date(),
         endTime: Date? = nil,
+        isNightSleep: Bool = false,
         baby: Baby? = nil
     ) {
         self.startTime = startTime
         self.endTime = endTime
+        self.isNightSleep = isNightSleep
         self.baby = baby
     }
 }

@@ -108,6 +108,12 @@ enum DayEngine {
         // Currently sleeping?
         if let sleep = activeSleep {
             let sleepMinutes = Int(now.timeIntervalSince(sleep.startTime) / 60)
+
+            // Nighttime sleep — day is done
+            if sleep.isNightSleep {
+                return .asleepForNight(sleepMinutes: sleepMinutes)
+            }
+
             let minutesUntilCutoff = Int(napCutoff.timeIntervalSince(now) / 60)
 
             if minutesUntilCutoff <= 0 {

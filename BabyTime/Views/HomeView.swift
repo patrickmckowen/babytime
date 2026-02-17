@@ -182,7 +182,7 @@ struct HomeView: View {
             return .awake(
                 label: "Awake for",
                 duration: formatMinutes(liveWakeMinutes ?? mins),
-                detail: "Wake window ended at \(napByTimeString(snapshot: snapshot, range: range))\nTry again"
+                detail: "Wake window ended at \(napByTimeString(snapshot: snapshot, range: range))"
             )
 
         case .sleepingNoPressure(let mins, _):

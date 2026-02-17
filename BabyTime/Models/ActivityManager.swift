@@ -553,6 +553,12 @@ final class ActivityManager {
         return formatter.string(from: Date())
     }
 
+    var dayOfWeekString: String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "EEEE"
+        return formatter.string(from: Date())
+    }
+
     var ageDisplayString: String {
         baby?.ageDescription ?? ""
     }

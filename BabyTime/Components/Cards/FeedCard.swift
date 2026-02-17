@@ -68,9 +68,13 @@ struct FeedCard: View {
                 Button {
                     onNurseTap?()
                 } label: {
-                    Label("Nurse", systemImage: "drop.fill")
-                        .font(BTTypography.label)
-                        .tracking(BTTracking.label)
+                    HStack(spacing: 6) {
+                            BTIcon(kind: .nursing)
+                                .frame(width: 16, height: 16)
+                            Text("Nurse")
+                                .font(BTTypography.label)
+                                .tracking(BTTracking.label)
+                        }
                         .foregroundStyle(Color.btTextPrimary)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 12)
@@ -82,9 +86,13 @@ struct FeedCard: View {
                 Button {
                     onBottleTap?()
                 } label: {
-                    Label("Bottle", systemImage: "waterbottle.fill")
-                        .font(BTTypography.label)
-                        .tracking(BTTracking.label)
+                    HStack(spacing: 6) {
+                            BTIcon(kind: .bottle)
+                                .frame(width: 16, height: 16)
+                            Text("Bottle")
+                                .font(BTTypography.label)
+                                .tracking(BTTracking.label)
+                        }
                         .foregroundStyle(Color.btTextPrimary)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 12)
@@ -127,9 +135,13 @@ struct FeedCard: View {
                 Button {
                     onNurseTap?()
                 } label: {
-                    Label("Nurse", systemImage: "drop.fill")
-                        .font(BTTypography.label)
-                        .tracking(BTTracking.label)
+                    HStack(spacing: 6) {
+                            BTIcon(kind: .nursing)
+                                .frame(width: 16, height: 16)
+                            Text("Nurse")
+                                .font(BTTypography.label)
+                                .tracking(BTTracking.label)
+                        }
                         .foregroundStyle(Color.btTextPrimary)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 12)
@@ -141,9 +153,13 @@ struct FeedCard: View {
                 Button {
                     onBottleTap?()
                 } label: {
-                    Label("Bottle", systemImage: "waterbottle.fill")
-                        .font(BTTypography.label)
-                        .tracking(BTTracking.label)
+                    HStack(spacing: 6) {
+                            BTIcon(kind: .bottle)
+                                .frame(width: 16, height: 16)
+                            Text("Bottle")
+                                .font(BTTypography.label)
+                                .tracking(BTTracking.label)
+                        }
                         .foregroundStyle(Color.btTextPrimary)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 12)

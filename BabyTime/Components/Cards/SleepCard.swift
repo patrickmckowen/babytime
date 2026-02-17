@@ -83,9 +83,13 @@ struct SleepCard: View {
             Button {
                 onSleepTap?()
             } label: {
-                Label("Sleep", systemImage: "moon.zzz.fill")
-                    .font(BTTypography.label)
-                    .tracking(BTTracking.label)
+                HStack(spacing: 6) {
+                        BTIcon(kind: .sleep)
+                            .frame(width: 16, height: 16)
+                        Text("Sleep")
+                            .font(BTTypography.label)
+                            .tracking(BTTracking.label)
+                    }
                     .foregroundStyle(Color.btTextPrimary)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 12)

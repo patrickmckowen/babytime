@@ -9,7 +9,6 @@ import SwiftUI
 
 struct TodaySummaryCard: View {
     let dateString: String
-    let ageString: String
     let totalSleep: String
     let longestSleep: String
     let napCount: Int
@@ -29,18 +28,11 @@ struct TodaySummaryCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            // Header: Date and age
-            VStack(alignment: .leading, spacing: 2) {
-                Text(dateString)
-                    .font(BTTypography.photoDate)
-                    .tracking(BTTracking.photoDate)
-                    .foregroundStyle(Color.btTextPrimary)
-
-                Text(ageString)
-                    .font(BTTypography.photoAge)
-                    .tracking(BTTracking.photoAge)
-                    .foregroundStyle(Color.btTextSecondary)
-            }
+            // Header: Day of the week
+            Text(dateString)
+                .font(BTTypography.headline)
+                .tracking(BTTracking.headline)
+                .foregroundStyle(Color.btTextPrimary)
 
             // Wake time row (always visible)
             WakeTimeRow(
@@ -62,7 +54,7 @@ struct TodaySummaryCard: View {
 
             // Feed row
             SummaryRow(
-                iconName: "drop.fill",
+                iconKind: .bottle,
                 iconColor: .btFeedAccent,
                 columns: [
                     StatColumn(label: "Feeds", value: "\(feedCount)"),
@@ -79,7 +71,7 @@ struct TodaySummaryCard: View {
 
             // Naps row
             SummaryRow(
-                iconName: "moon.fill",
+                iconKind: .sleep,
                 iconColor: .btSleepAccent,
                 columns: [
                     StatColumn(label: "Naps", value: "\(napCount)"),
@@ -131,7 +123,7 @@ private struct StatColumn: Identifiable {
 // MARK: - Summary Row
 
 private struct SummaryRow: View {
-    let iconName: String
+    let iconKind: BTIcon.Kind
     let iconColor: Color
     let columns: [StatColumn]
 
@@ -142,9 +134,9 @@ private struct SummaryRow: View {
                 .fill(iconColor.opacity(0.10))
                 .frame(width: BTIconSize.container, height: BTIconSize.container)
                 .overlay {
-                    Image(systemName: iconName)
-                        .font(.system(size: 16, weight: .medium))
+                    BTIcon(kind: iconKind)
                         .foregroundStyle(iconColor)
+                        .frame(width: 16, height: 16)
                 }
 
             // Stat columns — equal flex space
@@ -305,8 +297,7 @@ private struct BedtimeRow: View {
     ZStack {
         Color.btBackground.ignoresSafeArea()
         TodaySummaryCard(
-            dateString: "Friday, Feb 13",
-            ageString: "3 months old",
+            dateString: "Monday",
             totalSleep: "1h 30m",
             longestSleep: "45m",
             napCount: 3,

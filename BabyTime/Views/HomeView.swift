@@ -39,8 +39,7 @@ struct HomeView: View {
 
                     // 4. Today summary — tap navigates to Log
                     TodaySummaryCard(
-                        dateString: activityManager.shortDateDisplayString,
-                        ageString: activityManager.ageDisplayString,
+                        dateString: activityManager.dayOfWeekString,
                         totalSleep: activityManager.totalSleepFormatted,
                         longestSleep: activityManager.longestSleepFormatted,
                         napCount: activityManager.napCount,

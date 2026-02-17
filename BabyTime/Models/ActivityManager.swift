@@ -494,7 +494,7 @@ final class ActivityManager {
     }
 
     func nursingTimerMinutesString(at date: Date = Date()) -> String {
-        guard let start = nursingStartTime else { return "0m" }
+        guard let start = nursingStartTime else { return "" }
 
         let reference: Date
         if isNursingActive {
@@ -502,11 +502,12 @@ final class ActivityManager {
         } else if let end = nursingEndTime {
             reference = end
         } else {
-            return "0m"
+            return ""
         }
 
         let elapsed = max(0, reference.timeIntervalSince(start))
         let totalMinutes = Int(elapsed) / 60
+        if totalMinutes == 0 { return "" }
         let hours = totalMinutes / 60
         let minutes = totalMinutes % 60
         if hours > 0 {
@@ -516,7 +517,7 @@ final class ActivityManager {
     }
 
     func sleepTimerMinutesString(at date: Date = Date()) -> String {
-        guard let start = sleepStartTime else { return "0m" }
+        guard let start = sleepStartTime else { return "" }
 
         let reference: Date
         if isSleepActive {
@@ -524,11 +525,12 @@ final class ActivityManager {
         } else if let end = sleepEndTime {
             reference = end
         } else {
-            return "0m"
+            return ""
         }
 
         let elapsed = max(0, reference.timeIntervalSince(start))
         let totalMinutes = Int(elapsed) / 60
+        if totalMinutes == 0 { return "" }
         let hours = totalMinutes / 60
         let minutes = totalMinutes % 60
         if hours > 0 {

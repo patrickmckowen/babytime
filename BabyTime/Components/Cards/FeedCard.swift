@@ -10,7 +10,7 @@ import SwiftData
 
 struct FeedCard: View {
     let mode: Mode
-    var feedTransition: Namespace.ID
+    var sheetTransition: Namespace.ID
     var onTap: (() -> Void)?
     var onBottleTap: (() -> Void)?
     var onNurseTap: (() -> Void)?
@@ -51,12 +51,10 @@ struct FeedCard: View {
         offerDetail: String
     ) -> some View {
         VStack(alignment: .leading, spacing: 0) {
-            (Text("Fed ")
+            (Text("Last ate ")
                 .foregroundStyle(Color.btTextTertiary)
             + Text(lastFedAgo)
-                .foregroundStyle(Color.btTextPrimary)
-            + Text(" ago")
-                .foregroundStyle(Color.btTextTertiary))
+                .foregroundStyle(Color.btTextPrimary))
                 .font(BTTypography.headline)
                 .tracking(BTTracking.headline)
 
@@ -79,7 +77,7 @@ struct FeedCard: View {
                         .background(Color.btBackgroundSecondary)
                         .clipShape(Capsule())
                 }
-                .matchedTransitionSource(id: "nursingSheet", in: feedTransition)
+                .matchedTransitionSource(id: "nursingSheet", in: sheetTransition)
 
                 Button {
                     onBottleTap?()
@@ -93,7 +91,7 @@ struct FeedCard: View {
                         .background(Color.btBackgroundSecondary)
                         .clipShape(Capsule())
                 }
-                .matchedTransitionSource(id: "bottleSheet", in: feedTransition)
+                .matchedTransitionSource(id: "bottleSheet", in: sheetTransition)
             }
             .padding(.top, 18)
         }
@@ -138,7 +136,7 @@ struct FeedCard: View {
                         .background(Color.btBackgroundSecondary)
                         .clipShape(Capsule())
                 }
-                .matchedTransitionSource(id: "nursingSheet", in: feedTransition)
+                .matchedTransitionSource(id: "nursingSheet", in: sheetTransition)
 
                 Button {
                     onBottleTap?()
@@ -152,7 +150,7 @@ struct FeedCard: View {
                         .background(Color.btBackgroundSecondary)
                         .clipShape(Capsule())
                 }
-                .matchedTransitionSource(id: "bottleSheet", in: feedTransition)
+                .matchedTransitionSource(id: "bottleSheet", in: sheetTransition)
             }
             .padding(.top, 18)
         }
@@ -165,9 +163,10 @@ struct FeedCard: View {
     private var nursingActiveContent: some View {
         VStack(alignment: .leading, spacing: 0) {
             SwiftUI.TimelineView(.periodic(from: .now, by: 60)) { context in
-                (Text("Nursing ")
+                let mins = activityManager.nursingTimerMinutesString(at: context.date)
+                (Text("Nursing")
                     .foregroundStyle(Color.btFeedAccent)
-                + Text(activityManager.nursingTimerMinutesString(at: context.date))
+                + Text(mins.isEmpty ? "" : " \(mins)")
                     .foregroundStyle(Color.btTextPrimary))
                     .font(BTTypography.headline)
                     .tracking(BTTracking.headline)
@@ -193,7 +192,7 @@ struct FeedCard: View {
                 lastFedAgo: "1h 50m",
                 offerDetail: "Offer 4oz by 3:00 PM"
             ),
-            feedTransition: ns,
+            sheetTransition: ns,
             onBottleTap: {},
             onNurseTap: {}
         )
@@ -207,7 +206,7 @@ struct FeedCard: View {
         Color.btBackground.ignoresSafeArea()
         FeedCard(
             mode: .logFirstFeed,
-            feedTransition: ns,
+            sheetTransition: ns,
             onBottleTap: {},
             onNurseTap: {}
         )
@@ -223,7 +222,7 @@ struct FeedCard: View {
     )
     ZStack {
         Color.btBackground.ignoresSafeArea()
-        FeedCard(mode: .nursingActive, feedTransition: ns)
+        FeedCard(mode: .nursingActive, sheetTransition: ns)
             .padding(.horizontal, BTSpacing.pageMargin)
     }
     .environment(ActivityManager(modelContext: container.mainContext))

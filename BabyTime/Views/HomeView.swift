@@ -11,7 +11,7 @@ import SwiftData
 
 struct HomeView: View {
     @Environment(ActivityManager.self) private var activityManager
-    var feedTransition: Namespace.ID
+    var sheetTransition: Namespace.ID
     var onNursingTap: (() -> Void)?
     var onBottleTap: (() -> Void)?
     var onSleepTap: (() -> Void)?
@@ -91,13 +91,13 @@ struct HomeView: View {
         if activityManager.isNursingActive || activityManager.hasNursingSession {
             FeedCard(
                 mode: .nursingActive,
-                feedTransition: feedTransition,
+                sheetTransition: sheetTransition,
                 onTap: onNursingTap
             )
         } else if activityManager.snapshot?.feedState == .noFeedsYet {
             FeedCard(
                 mode: .logFirstFeed,
-                feedTransition: feedTransition,
+                sheetTransition: sheetTransition,
                 onBottleTap: onBottleTap,
                 onNurseTap: onNursingTap
             )
@@ -110,7 +110,7 @@ struct HomeView: View {
                         lastFedAgo: formatMinutes(Int(context.date.timeIntervalSince(feedRef) / 60)),
                         offerDetail: feedOfferDetail(feedRef: feedRef, now: context.date)
                     ),
-                    feedTransition: feedTransition,
+                    sheetTransition: sheetTransition,
                     onBottleTap: onBottleTap,
                     onNurseTap: onNursingTap
                 )
@@ -121,7 +121,7 @@ struct HomeView: View {
                     lastFedAgo: activityManager.timeSinceLastFeedDuration,
                     offerDetail: feedOfferDetail(feedRef: nil, now: Date())
                 ),
-                feedTransition: feedTransition,
+                sheetTransition: sheetTransition,
                 onBottleTap: onBottleTap,
                 onNurseTap: onNursingTap
             )
@@ -135,7 +135,7 @@ struct HomeView: View {
         if activityManager.isSleepActive || activityManager.hasSleepSession {
             SleepCard(
                 mode: .sleepActive,
-                feedTransition: feedTransition,
+                sheetTransition: sheetTransition,
                 onTap: onSleepTap
             )
         } else if let snapshot = activityManager.snapshot {
@@ -144,7 +144,7 @@ struct HomeView: View {
                 SwiftUI.TimelineView(.periodic(from: .now, by: 60)) { context in
                     SleepCard(
                         mode: sleepCardMode(from: snapshot, now: context.date),
-                        feedTransition: feedTransition,
+                        sheetTransition: sheetTransition,
                         onSleepTap: onSleepTap,
                         onWakeTimeSubmit: { time in
                             activityManager.setWakeTime(time)
@@ -156,13 +156,13 @@ struct HomeView: View {
                 SwiftUI.TimelineView(.periodic(from: .now, by: 60)) { context in
                     SleepCard(
                         mode: sleepCardMode(from: snapshot, now: context.date),
-                        feedTransition: feedTransition
+                        sheetTransition: sheetTransition
                     )
                 }
             } else {
                 SleepCard(
                     mode: sleepCardMode(from: snapshot),
-                    feedTransition: feedTransition,
+                    sheetTransition: sheetTransition,
                     onSleepTap: onSleepTap,
                     onWakeTimeSubmit: { time in
                         activityManager.setWakeTime(time)
@@ -175,7 +175,7 @@ struct HomeView: View {
         } else {
             SleepCard(
                 mode: .wakeTimePrompt(babyName: activityManager.babyName),
-                feedTransition: feedTransition,
+                sheetTransition: sheetTransition,
                 onWakeTimeSubmit: { time in
                     activityManager.setWakeTime(time)
                 }
@@ -314,6 +314,6 @@ struct HomeView: View {
     let baby = manager.addBaby(name: "Kaia", birthdate: Calendar.current.date(byAdding: .day, value: -100, to: Date())!)
     manager.selectBaby(baby)
 
-    return HomeView(feedTransition: ns)
+    return HomeView(sheetTransition: ns)
         .environment(manager)
 }

@@ -19,7 +19,7 @@ struct ContentView: View {
     @State private var showSettings = false
     @State private var selectedPhoto: PhotosPickerItem?
     @State private var showPhotoPicker = false
-    @Namespace private var feedTransition
+    @Namespace private var sheetTransition
     @State private var showLog = false
 
     var body: some View {
@@ -27,7 +27,7 @@ struct ContentView: View {
             Group {
                 if activityManager.baby != nil {
                     HomeView(
-                        feedTransition: feedTransition,
+                        sheetTransition: sheetTransition,
                         onNursingTap: { showNursingSheet = true },
                         onBottleTap: { showBottleSheet = true },
                         onSleepTap: { showSleepSheet = true },
@@ -49,17 +49,17 @@ struct ContentView: View {
         .sheet(isPresented: $showNursingSheet) {
             NursingSheetView()
                 .presentationDetents([.large])
-                .navigationTransition(.zoom(sourceID: "nursingSheet", in: feedTransition))
+                .navigationTransition(.zoom(sourceID: "nursingSheet", in: sheetTransition))
         }
         .sheet(isPresented: $showBottleSheet) {
             BottleSheetView()
                 .presentationDetents([.large])
-                .navigationTransition(.zoom(sourceID: "bottleSheet", in: feedTransition))
+                .navigationTransition(.zoom(sourceID: "bottleSheet", in: sheetTransition))
         }
         .sheet(isPresented: $showSleepSheet) {
             SleepSheetView()
                 .presentationDetents([.large])
-                .navigationTransition(.zoom(sourceID: "sleepSheet", in: feedTransition))
+                .navigationTransition(.zoom(sourceID: "sleepSheet", in: sheetTransition))
         }
         .photosPicker(
             isPresented: $showPhotoPicker,

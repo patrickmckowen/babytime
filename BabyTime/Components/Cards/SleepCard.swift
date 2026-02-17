@@ -9,7 +9,7 @@ import SwiftUI
 
 struct SleepCard: View {
     let mode: Mode
-    var feedTransition: Namespace.ID
+    var sheetTransition: Namespace.ID
     var onTap: (() -> Void)?
     var onSleepTap: (() -> Void)?
     var onWakeTimeSubmit: ((Date) -> Void)?
@@ -92,7 +92,7 @@ struct SleepCard: View {
                     .background(Color.btBackgroundSecondary)
                     .clipShape(Capsule())
             }
-            .matchedTransitionSource(id: "sleepSheet", in: feedTransition)
+            .matchedTransitionSource(id: "sleepSheet", in: sheetTransition)
             .padding(.top, 18)
         }
     }
@@ -196,9 +196,10 @@ struct SleepCard: View {
     private var sleepActiveContent: some View {
         VStack(alignment: .leading, spacing: 0) {
             SwiftUI.TimelineView(.periodic(from: .now, by: 60)) { context in
-                (Text("Asleep ")
+                let mins = activityManager.sleepTimerMinutesString(at: context.date)
+                (Text("Asleep")
                     .foregroundStyle(Color.btSleepAccent)
-                + Text(activityManager.sleepTimerMinutesString(at: context.date))
+                + Text(mins.isEmpty ? "" : " \(mins)")
                     .foregroundStyle(Color.btTextPrimary))
                     .font(BTTypography.headline)
                     .tracking(BTTracking.headline)
@@ -224,7 +225,7 @@ struct SleepCard: View {
                 duration: "1h 25m",
                 detail: "Nap by 11:30 AM"
             ),
-            feedTransition: ns,
+            sheetTransition: ns,
             onSleepTap: {}
         )
         .padding(.horizontal, BTSpacing.pageMargin)
@@ -240,7 +241,7 @@ struct SleepCard: View {
                 duration: "3h 15m",
                 detail: "No more naps today"
             ),
-            feedTransition: ns,
+            sheetTransition: ns,
             onSleepTap: {}
         )
         .padding(.horizontal, BTSpacing.pageMargin)
@@ -253,7 +254,7 @@ struct SleepCard: View {
         Color.btBackground.ignoresSafeArea()
         SleepCard(
             mode: .wakeTimePrompt(babyName: "Kaia"),
-            feedTransition: ns,
+            sheetTransition: ns,
             onWakeTimeSubmit: { _ in }
         )
         .padding(.horizontal, BTSpacing.pageMargin)
@@ -266,7 +267,7 @@ struct SleepCard: View {
         Color.btBackground.ignoresSafeArea()
         SleepCard(
             mode: .bedtimePrompt(babyName: "Kaia"),
-            feedTransition: ns,
+            sheetTransition: ns,
             onBedtimeSubmit: { _ in }
         )
         .padding(.horizontal, BTSpacing.pageMargin)
@@ -282,7 +283,7 @@ struct SleepCard: View {
                 duration: "35m",
                 detail: "Started at 1:30 PM"
             ),
-            feedTransition: ns
+            sheetTransition: ns
         )
         .padding(.horizontal, BTSpacing.pageMargin)
     }

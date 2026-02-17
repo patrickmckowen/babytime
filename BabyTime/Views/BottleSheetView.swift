@@ -38,10 +38,7 @@ struct BottleSheetView: View {
                     .padding(.top, 24)
             }
             .padding(.horizontal, BTSpacing.pageMargin)
-            .padding(.bottom, BTSpacing.pageMargin)
             .background(Color.btBackgroundSecondary)
-            .navigationTitle(isEditing ? "Edit Bottle" : "Bottle")
-            .navigationBarTitleDisplayMode(.inline)
         }
         .onAppear {
             if let event = editingEvent {
@@ -56,7 +53,7 @@ struct BottleSheetView: View {
     private var amountDisplay: some View {
         VStack(spacing: 8) {
             Text(formattedAmount)
-                .font(.system(size: 64, weight: .regular, design: .default))
+                .font(.system(size: 72, weight: .regular, design: .default))
                 .monospacedDigit()
                 .tracking(-2)
                 .foregroundStyle(Color.btTextPrimary)

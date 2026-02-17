@@ -48,17 +48,17 @@ struct ContentView: View {
         }
         .sheet(isPresented: $showNursingSheet) {
             NursingSheetView()
-                .presentationDetents([.large])
+                .presentationDetents([.medium, .large])
                 .navigationTransition(.zoom(sourceID: "nursingSheet", in: sheetTransition))
         }
         .sheet(isPresented: $showBottleSheet) {
             BottleSheetView()
-                .presentationDetents([.large])
+                .presentationDetents([.medium, .large])
                 .navigationTransition(.zoom(sourceID: "bottleSheet", in: sheetTransition))
         }
         .sheet(isPresented: $showSleepSheet) {
             SleepSheetView()
-                .presentationDetents([.large])
+                .presentationDetents([.medium, .large])
                 .navigationTransition(.zoom(sourceID: "sleepSheet", in: sheetTransition))
         }
         .photosPicker(

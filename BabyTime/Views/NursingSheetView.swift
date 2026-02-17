@@ -54,7 +54,7 @@ struct NursingSheetView: View {
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
-                // Timer tap target — entire area from navbar to timesList
+                // Timer tap target
                 VStack {
                     Spacer()
                     timerDisplay
@@ -75,20 +75,7 @@ struct NursingSheetView: View {
                     .padding(.top, 24)
             }
             .padding(.horizontal, BTSpacing.pageMargin)
-            .padding(.bottom, BTSpacing.pageMargin)
             .background(Color.btBackgroundSecondary)
-            .navigationTitle(isEditing ? "Edit Nursing" : "Nursing")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button {
-                        dismiss()
-                    } label: {
-                        Image(systemName: "chevron.down")
-                            .fontWeight(.semibold)
-                    }
-                }
-            }
         }
         .onAppear {
             if let event = editingEvent {
@@ -136,7 +123,7 @@ struct NursingSheetView: View {
         VStack(spacing: 8) {
             SwiftUI.TimelineView(.periodic(from: .now, by: 1)) { context in
                 Text(durationString(at: context.date))
-                    .font(.system(size: 64, weight: .regular, design: .default))
+                    .font(.system(size: 72, weight: .regular, design: .default))
                     .monospacedDigit()
                     .tracking(-2)
                     .foregroundStyle(Color.btTextPrimary)

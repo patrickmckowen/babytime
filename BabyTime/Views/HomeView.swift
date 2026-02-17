@@ -116,6 +116,7 @@ struct HomeView: View {
         if activityManager.isSleepActive || activityManager.hasSleepSession {
             SleepCard(
                 mode: .sleepActive,
+                feedTransition: feedTransition,
                 onTap: onSleepTap
             )
         } else if let snapshot = activityManager.snapshot {
@@ -124,7 +125,8 @@ struct HomeView: View {
                 SwiftUI.TimelineView(.periodic(from: .now, by: 60)) { context in
                     SleepCard(
                         mode: sleepCardMode(from: snapshot, now: context.date),
-                        onTap: nil,
+                        feedTransition: feedTransition,
+                        onSleepTap: onSleepTap,
                         onWakeTimeSubmit: { time in
                             activityManager.setWakeTime(time)
                         }
@@ -135,13 +137,14 @@ struct HomeView: View {
                 SwiftUI.TimelineView(.periodic(from: .now, by: 60)) { context in
                     SleepCard(
                         mode: sleepCardMode(from: snapshot, now: context.date),
-                        onTap: nil
+                        feedTransition: feedTransition
                     )
                 }
             } else {
                 SleepCard(
                     mode: sleepCardMode(from: snapshot),
-                    onTap: nil,
+                    feedTransition: feedTransition,
+                    onSleepTap: onSleepTap,
                     onWakeTimeSubmit: { time in
                         activityManager.setWakeTime(time)
                     },
@@ -153,6 +156,7 @@ struct HomeView: View {
         } else {
             SleepCard(
                 mode: .wakeTimePrompt(babyName: activityManager.babyName),
+                feedTransition: feedTransition,
                 onWakeTimeSubmit: { time in
                     activityManager.setWakeTime(time)
                 }

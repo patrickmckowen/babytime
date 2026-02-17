@@ -78,3 +78,9 @@
 - **`.nursingActive` mode:** No `matchedTransitionSource` — the card tap opens nursing sheet with standard presentation since there's no dedicated button
 - **Known risk:** iOS 26 beta 3 has occasional glitchiness with sheet zoom transitions. Fallback: swap `.sheet` to `.fullScreenCover` if zoom is unreliable
 - **Attempt 1 status:** Compiles, not yet tested on device/simulator. Need to verify zoom animation quality
+
+### Fluid Transition: SleepCard → SleepSheetView
+- Same pattern as FeedCard: `feedTransition: Namespace.ID` threaded through HomeView → SleepCard
+- Source ID: `"sleepSheet"` on Sleep button in `awakeContent()`
+- Sleep button added to `.awake` mode only (not `.sleepActive`, `.wakeTimePrompt`, `.bedtimePrompt`, `.sleeping`)
+- `.sleepActive` mode: no `matchedTransitionSource` — standard sheet presentation (same as `.nursingActive`)

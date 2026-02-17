@@ -9,7 +9,9 @@ import SwiftUI
 
 struct SleepCard: View {
     let mode: Mode
+    var feedTransition: Namespace.ID
     var onTap: (() -> Void)?
+    var onSleepTap: (() -> Void)?
     var onWakeTimeSubmit: ((Date) -> Void)?
     var onBedtimeSubmit: ((Date) -> Void)?
 
@@ -82,6 +84,21 @@ struct SleepCard: View {
                     .foregroundStyle(Color.btTextSecondary)
                     .padding(.top, BTSpacing.headlineToDetail)
             }
+
+            Button {
+                onSleepTap?()
+            } label: {
+                Label("Sleep", systemImage: "moon.zzz.fill")
+                    .font(BTTypography.label)
+                    .tracking(BTTracking.label)
+                    .foregroundStyle(Color.btTextPrimary)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 12)
+                    .background(Color.btBackgroundSecondary)
+                    .clipShape(Capsule())
+            }
+            .matchedTransitionSource(id: "sleepSheet", in: feedTransition)
+            .padding(.top, 18)
         }
     }
 
@@ -213,6 +230,7 @@ struct SleepCard: View {
 }
 
 #Preview("Awake") {
+    @Previewable @Namespace var ns
     ZStack {
         Color.btBackground.ignoresSafeArea()
         SleepCard(
@@ -220,13 +238,16 @@ struct SleepCard: View {
                 label: "Awake for",
                 duration: "1h 25m",
                 detail: "Nap by 11:30 AM"
-            )
+            ),
+            feedTransition: ns,
+            onSleepTap: {}
         )
         .padding(.horizontal, BTSpacing.pageMargin)
     }
 }
 
 #Preview("Nap Window Open") {
+    @Previewable @Namespace var ns
     ZStack {
         Color.btBackground.ignoresSafeArea()
         SleepCard(
@@ -234,17 +255,21 @@ struct SleepCard: View {
                 label: "Nap window open",
                 duration: "1h 25m",
                 detail: "Nap by 11:30 AM"
-            )
+            ),
+            feedTransition: ns,
+            onSleepTap: {}
         )
         .padding(.horizontal, BTSpacing.pageMargin)
     }
 }
 
 #Preview("Wake Time Prompt") {
+    @Previewable @Namespace var ns
     ZStack {
         Color.btBackground.ignoresSafeArea()
         SleepCard(
             mode: .wakeTimePrompt(babyName: "Kaia"),
+            feedTransition: ns,
             onWakeTimeSubmit: { _ in }
         )
         .padding(.horizontal, BTSpacing.pageMargin)
@@ -252,10 +277,12 @@ struct SleepCard: View {
 }
 
 #Preview("Bedtime Prompt") {
+    @Previewable @Namespace var ns
     ZStack {
         Color.btBackground.ignoresSafeArea()
         SleepCard(
             mode: .bedtimePrompt(babyName: "Kaia"),
+            feedTransition: ns,
             onBedtimeSubmit: { _ in }
         )
         .padding(.horizontal, BTSpacing.pageMargin)
@@ -263,6 +290,7 @@ struct SleepCard: View {
 }
 
 #Preview("Sleeping") {
+    @Previewable @Namespace var ns
     ZStack {
         Color.btBackground.ignoresSafeArea()
         SleepCard(
@@ -270,7 +298,8 @@ struct SleepCard: View {
                 label: "Sleeping",
                 duration: "35m",
                 detail: "Started at 1:30 PM"
-            )
+            ),
+            feedTransition: ns
         )
         .padding(.horizontal, BTSpacing.pageMargin)
     }

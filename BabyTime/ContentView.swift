@@ -119,6 +119,8 @@ struct ContentView: View {
         }
         .sheet(isPresented: $showSleepSheet) {
             SleepSheetView()
+                .presentationDetents([.large])
+                .navigationTransition(.zoom(sourceID: "sleepSheet", in: feedTransition))
         }
         .photosPicker(
             isPresented: $showPhotoPicker,

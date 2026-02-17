@@ -51,16 +51,14 @@ struct FeedCard: View {
         offerDetail: String
     ) -> some View {
         VStack(alignment: .leading, spacing: 0) {
-            Text("Last fed")
-                .font(BTTypography.label)
-                .tracking(BTTracking.label)
-                .foregroundStyle(Color.btTextSecondary)
-
-            Text(lastFedAgo)
+            (Text("Fed ")
+                .foregroundStyle(Color.btTextTertiary)
+            + Text(lastFedAgo)
+                .foregroundStyle(Color.btTextPrimary)
+            + Text(" ago")
+                .foregroundStyle(Color.btTextTertiary))
                 .font(BTTypography.headline)
                 .tracking(BTTracking.headline)
-                .foregroundStyle(Color.btTextPrimary)
-                .padding(.top, BTSpacing.labelToHeadline)
 
             Text(offerDetail)
                 .font(BTTypography.label)
@@ -166,17 +164,13 @@ struct FeedCard: View {
 
     private var nursingActiveContent: some View {
         VStack(alignment: .leading, spacing: 0) {
-            Text("Nursing")
-                .font(BTTypography.label)
-                .tracking(BTTracking.label)
-                .foregroundStyle(Color.btFeedAccent)
-
-            SwiftUI.TimelineView(.periodic(from: .now, by: 1)) { context in
-                Text(activityManager.nursingTimerString(at: context.date))
+            SwiftUI.TimelineView(.periodic(from: .now, by: 60)) { context in
+                (Text("Nursing ")
+                    .foregroundStyle(Color.btFeedAccent)
+                + Text(activityManager.nursingTimerMinutesString(at: context.date))
+                    .foregroundStyle(Color.btTextPrimary))
                     .font(BTTypography.headline)
                     .tracking(BTTracking.headline)
-                    .foregroundStyle(Color.btTextPrimary)
-                    .padding(.top, BTSpacing.labelToHeadline)
             }
 
             if let start = activityManager.nursingStartTime {

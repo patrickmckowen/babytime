@@ -16,6 +16,8 @@ struct HomeView: View {
     var onBottleTap: (() -> Void)?
     var onSleepTap: (() -> Void)?
     var onPhotoTap: (() -> Void)?
+    var onLogTap: (() -> Void)?
+    var onSettingsTap: (() -> Void)?
 
     var body: some View {
         ScrollView {
@@ -35,7 +37,7 @@ struct HomeView: View {
                     // 3. Sleep card
                     sleepCard
 
-                    // 4. Today summary
+                    // 4. Today summary — tap navigates to Log
                     TodaySummaryCard(
                         dateString: activityManager.shortDateDisplayString,
                         ageString: activityManager.ageDisplayString,
@@ -55,6 +57,23 @@ struct HomeView: View {
                             activityManager.updateBedtime(time)
                         }
                     )
+                    .onTapGesture {
+                        onLogTap?()
+                    }
+
+                    // 5. Settings button
+                    Button {
+                        onSettingsTap?()
+                    } label: {
+                        HStack(spacing: 4) {
+                            Image(systemName: "gearshape")
+                                .font(.system(size: 13))
+                            Text("Settings")
+                                .font(.footnote)
+                        }
+                        .foregroundStyle(Color.btTextMuted)
+                    }
+                    .padding(.top, 24)
                 }
                 .padding(.top, BTSpacing.photoToCard)
                 .padding(.horizontal, BTSpacing.pageMargin)
@@ -177,49 +196,42 @@ struct HomeView: View {
 
         case .awakeEarly(let mins, let range):
             return .awake(
-                label: "Awake for",
                 duration: formatMinutes(liveWakeMinutes ?? mins),
                 detail: "Nap by \(napByTimeString(snapshot: snapshot, range: range))"
             )
 
         case .awakeApproaching(let mins, let range):
             return .awake(
-                label: "Nap window open",
                 duration: formatMinutes(liveWakeMinutes ?? mins),
                 detail: "Nap by \(napByTimeString(snapshot: snapshot, range: range))"
             )
 
         case .awakeBeyond(let mins, let range):
             return .awake(
-                label: "Past wake window",
                 duration: formatMinutes(liveWakeMinutes ?? mins),
-                detail: "Due at \(napByTimeString(snapshot: snapshot, range: range))"
+                detail: "Wake window ended at \(napByTimeString(snapshot: snapshot, range: range))"
             )
 
         case .sleepingNoPressure(let mins, _):
             return .sleeping(
-                label: "Sleeping",
                 duration: formatMinutes(mins),
                 detail: "Started at \(activityManager.todaySleeps.last?.startTime.shortTime ?? "--")"
             )
 
         case .sleepingApproachingCutoff(let mins, let untilCutoff):
             return .sleeping(
-                label: "Sleeping",
                 duration: formatMinutes(mins),
                 detail: "Wake in \(formatMinutes(untilCutoff)) for bedtime"
             )
 
         case .sleepingMustEnd(let mins, _):
             return .sleeping(
-                label: "Wake her up",
                 duration: formatMinutes(mins),
                 detail: "Past cutoff for bedtime"
             )
 
         case .napWindowClosed(let mins, _):
             return .awake(
-                label: "Bridging to bedtime",
                 duration: formatMinutes(liveWakeMinutes ?? mins),
                 detail: "No more naps today"
             )
@@ -233,7 +245,6 @@ struct HomeView: View {
                 return max(0, Int(now.timeIntervalSince(nightSleep.startTime) / 60))
             }()
             return .sleeping(
-                label: "Sleeping",
                 duration: formatMinutes(liveMins),
                 detail: "Fell asleep at \(activityManager.todayNightSleep?.startTime.shortTime ?? "--")"
             )

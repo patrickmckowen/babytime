@@ -22,6 +22,9 @@ extension Color {
     /// Labels, subheads, supporting text
     static let btTextSecondary = Color(red: 0.608, green: 0.557, blue: 0.510) // #9B8E82
 
+    /// Verb words in card headlines ("Fed", "ago", "Awake", "Asleep", "Nursing")
+    static let btTextTertiary = Color(red: 0.173, green: 0.145, blue: 0.125).opacity(0.35) // #2C2520 @ 35%
+
     /// Stat column labels in the Today card
     static let btTextMuted = Color(red: 0.741, green: 0.694, blue: 0.647) // #BDB1A5
 

@@ -31,73 +31,12 @@ struct ContentView: View {
                         onNursingTap: { showNursingSheet = true },
                         onBottleTap: { showBottleSheet = true },
                         onSleepTap: { showSleepSheet = true },
-                        onPhotoTap: { showPhotoPicker = true }
+                        onPhotoTap: { showPhotoPicker = true },
+                        onLogTap: { showLog = true },
+                        onSettingsTap: { showSettings = true }
                     )
                 } else {
                     WelcomeView()
-                }
-            }
-            .safeAreaInset(edge: .bottom) {
-                if activityManager.baby != nil {
-                    HStack {
-                        // Left: Settings
-                        Button {
-                            showSettings = true
-                        } label: {
-                            Image(systemName: "slider.horizontal.3")
-                                .font(.body)
-                                .foregroundStyle(Color.btTextPrimary)
-                                .frame(width: 44, height: 44)
-                        }
-                        .glassEffect(.regular.interactive(), in: .circle)
-
-                        Spacer()
-
-                        // Center: Log actions grouped in capsule
-                        HStack(spacing: 0) {
-                            Button {
-                                showNursingSheet = true
-                            } label: {
-                                Image(systemName: "drop.fill")
-                                    .font(.body)
-                                    .foregroundStyle(Color.btTextPrimary)
-                                    .frame(width: 44, height: 44)
-                            }
-
-                            Button {
-                                showBottleSheet = true
-                            } label: {
-                                Image(systemName: "waterbottle.fill")
-                                    .font(.body)
-                                    .foregroundStyle(Color.btTextPrimary)
-                                    .frame(width: 44, height: 44)
-                            }
-
-                            Button {
-                                showSleepSheet = true
-                            } label: {
-                                Image(systemName: "moon.zzz.fill")
-                                    .font(.body)
-                                    .foregroundStyle(Color.btTextPrimary)
-                                    .frame(width: 44, height: 44)
-                            }
-                        }
-                        .glassEffect(.regular.interactive(), in: .capsule)
-
-                        Spacer()
-
-                        // Right: Calendar → Activity Log
-                        Button {
-                            showLog = true
-                        } label: {
-                            Image(systemName: "calendar")
-                                .font(.body)
-                                .foregroundStyle(Color.btTextPrimary)
-                                .frame(width: 44, height: 44)
-                        }
-                        .glassEffect(.regular.interactive(), in: .circle)
-                    }
-                    .padding(.horizontal, BTSpacing.pageMargin)
                 }
             }
             .navigationDestination(isPresented: $showLog) {

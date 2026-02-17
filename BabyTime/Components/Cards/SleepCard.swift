@@ -16,10 +16,10 @@ struct SleepCard: View {
     var onBedtimeSubmit: ((Date) -> Void)?
 
     enum Mode {
-        /// Awake states — configurable label, duration, and detail
-        case awake(label: String, duration: String, detail: String)
+        /// Awake states — duration and detail line
+        case awake(duration: String, detail: String)
         /// Sleeping states (not active timer) — engine says baby is sleeping
-        case sleeping(label: String, duration: String, detail: String)
+        case sleeping(duration: String, detail: String)
         /// Active sleep timer (user started timer from sheet)
         case sleepActive
         /// Empty state — prompt user for wake time
@@ -34,10 +34,10 @@ struct SleepCard: View {
     var body: some View {
         Group {
             switch mode {
-            case .awake(let label, let duration, let detail):
-                awakeContent(label: label, duration: duration, detail: detail)
-            case .sleeping(let label, let duration, let detail):
-                sleepingContent(label: label, duration: duration, detail: detail)
+            case .awake(let duration, let detail):
+                awakeContent(duration: duration, detail: detail)
+            case .sleeping(let duration, let detail):
+                sleepingContent(duration: duration, detail: detail)
             case .sleepActive:
                 sleepActiveContent
             case .wakeTimePrompt(let babyName):
@@ -61,21 +61,16 @@ struct SleepCard: View {
     // MARK: - Awake Content
 
     private func awakeContent(
-        label: String,
         duration: String,
         detail: String
     ) -> some View {
         VStack(alignment: .leading, spacing: 0) {
-            Text(label)
-                .font(BTTypography.label)
-                .tracking(BTTracking.label)
-                .foregroundStyle(Color.btTextSecondary)
-
-            Text(duration)
+            (Text("Awake ")
+                .foregroundStyle(Color.btTextTertiary)
+            + Text(duration)
+                .foregroundStyle(Color.btTextPrimary))
                 .font(BTTypography.headline)
                 .tracking(BTTracking.headline)
-                .foregroundStyle(Color.btTextPrimary)
-                .padding(.top, BTSpacing.labelToHeadline)
 
             if !detail.isEmpty {
                 Text(detail)
@@ -105,21 +100,16 @@ struct SleepCard: View {
     // MARK: - Sleeping Content (engine-reported)
 
     private func sleepingContent(
-        label: String,
         duration: String,
         detail: String
     ) -> some View {
         VStack(alignment: .leading, spacing: 0) {
-            Text(label)
-                .font(BTTypography.label)
-                .tracking(BTTracking.label)
+            (Text("Asleep ")
                 .foregroundStyle(Color.btSleepAccent)
-
-            Text(duration)
+            + Text(duration)
+                .foregroundStyle(Color.btTextPrimary))
                 .font(BTTypography.headline)
                 .tracking(BTTracking.headline)
-                .foregroundStyle(Color.btTextPrimary)
-                .padding(.top, BTSpacing.labelToHeadline)
 
             if !detail.isEmpty {
                 Text(detail)
@@ -205,17 +195,13 @@ struct SleepCard: View {
 
     private var sleepActiveContent: some View {
         VStack(alignment: .leading, spacing: 0) {
-            Text("Sleeping")
-                .font(BTTypography.label)
-                .tracking(BTTracking.label)
-                .foregroundStyle(Color.btSleepAccent)
-
-            SwiftUI.TimelineView(.periodic(from: .now, by: 1)) { context in
-                Text(activityManager.sleepTimerString(at: context.date))
+            SwiftUI.TimelineView(.periodic(from: .now, by: 60)) { context in
+                (Text("Asleep ")
+                    .foregroundStyle(Color.btSleepAccent)
+                + Text(activityManager.sleepTimerMinutesString(at: context.date))
+                    .foregroundStyle(Color.btTextPrimary))
                     .font(BTTypography.headline)
                     .tracking(BTTracking.headline)
-                    .foregroundStyle(Color.btTextPrimary)
-                    .padding(.top, BTSpacing.labelToHeadline)
             }
 
             if let start = activityManager.sleepStartTime {
@@ -235,7 +221,6 @@ struct SleepCard: View {
         Color.btBackground.ignoresSafeArea()
         SleepCard(
             mode: .awake(
-                label: "Awake for",
                 duration: "1h 25m",
                 detail: "Nap by 11:30 AM"
             ),
@@ -246,15 +231,14 @@ struct SleepCard: View {
     }
 }
 
-#Preview("Nap Window Open") {
+#Preview("No More Naps") {
     @Previewable @Namespace var ns
     ZStack {
         Color.btBackground.ignoresSafeArea()
         SleepCard(
             mode: .awake(
-                label: "Nap window open",
-                duration: "1h 25m",
-                detail: "Nap by 11:30 AM"
+                duration: "3h 15m",
+                detail: "No more naps today"
             ),
             feedTransition: ns,
             onSleepTap: {}
@@ -289,13 +273,12 @@ struct SleepCard: View {
     }
 }
 
-#Preview("Sleeping") {
+#Preview("Asleep") {
     @Previewable @Namespace var ns
     ZStack {
         Color.btBackground.ignoresSafeArea()
         SleepCard(
             mode: .sleeping(
-                label: "Sleeping",
                 duration: "35m",
                 detail: "Started at 1:30 PM"
             ),

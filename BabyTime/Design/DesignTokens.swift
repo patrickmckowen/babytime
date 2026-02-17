@@ -10,8 +10,11 @@ import SwiftUI
 // MARK: - Color Tokens
 
 extension Color {
-    /// Page background and card background (cards float via shadow)
-    static let btBackground = Color(red: 0.961, green: 0.945, blue: 0.922) // #F5F1EB
+    /// Page background and card background
+    static let btBackground = Color.white
+
+    /// Secondary background for sheets and sheet cards
+    static let btBackgroundSecondary = Color(red: 0.961, green: 0.945, blue: 0.922) // #F5F1EB
 
     /// Headlines, stat values, primary content
     static let btTextPrimary = Color(red: 0.173, green: 0.145, blue: 0.125) // #2C2520

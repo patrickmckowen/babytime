@@ -76,7 +76,7 @@ struct SleepSheetView: View {
             }
             .padding(.horizontal, BTSpacing.pageMargin)
             .padding(.bottom, BTSpacing.pageMargin)
-            .background(Color.btBackground)
+            .background(Color.btBackgroundSecondary)
             .navigationTitle(isEditing ? "Edit Sleep" : "Sleep")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -225,7 +225,7 @@ struct SleepSheetView: View {
             .padding(.vertical, 14)
         }
         .padding(.horizontal, BTSpacing.cardPaddingHorizontal)
-        .background(Color.btBackground)
+        .background(Color.btBackgroundSecondary)
         .clipShape(RoundedRectangle(cornerRadius: BTRadius.card, style: .continuous))
         .cardShadow()
         .padding(.vertical, 4)
@@ -282,7 +282,7 @@ struct SleepSheetView: View {
                     .foregroundStyle(Color.btTextSecondary)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 16)
-                    .background(Color.btBackground)
+                    .background(Color.btBackgroundSecondary)
                     .clipShape(Capsule())
                     .cardShadow()
             }

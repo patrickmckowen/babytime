@@ -76,7 +76,7 @@ struct NursingSheetView: View {
             }
             .padding(.horizontal, BTSpacing.pageMargin)
             .padding(.bottom, BTSpacing.pageMargin)
-            .background(Color.btBackground)
+            .background(Color.btBackgroundSecondary)
             .navigationTitle(isEditing ? "Edit Nursing" : "Nursing")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -222,7 +222,7 @@ struct NursingSheetView: View {
             .padding(.vertical, 14)
         }
         .padding(.horizontal, BTSpacing.cardPaddingHorizontal)
-        .background(Color.btBackground)
+        .background(Color.btBackgroundSecondary)
         .clipShape(RoundedRectangle(cornerRadius: BTRadius.card, style: .continuous))
         .cardShadow()
         .padding(.vertical, 4)
@@ -283,7 +283,7 @@ struct NursingSheetView: View {
                     .foregroundStyle(Color.btTextSecondary)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 16)
-                    .background(Color.btBackground)
+                    .background(Color.btBackgroundSecondary)
                     .clipShape(Capsule())
                     .cardShadow()
             }

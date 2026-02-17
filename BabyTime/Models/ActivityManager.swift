@@ -493,6 +493,52 @@ final class ActivityManager {
         return String(format: "%02d:%02d", minutes, seconds)
     }
 
+    func nursingTimerMinutesString(at date: Date = Date()) -> String {
+        guard let start = nursingStartTime else { return "" }
+
+        let reference: Date
+        if isNursingActive {
+            reference = date
+        } else if let end = nursingEndTime {
+            reference = end
+        } else {
+            return ""
+        }
+
+        let elapsed = max(0, reference.timeIntervalSince(start))
+        let totalMinutes = Int(elapsed) / 60
+        if totalMinutes == 0 { return "" }
+        let hours = totalMinutes / 60
+        let minutes = totalMinutes % 60
+        if hours > 0 {
+            return "\(hours)h \(minutes)m"
+        }
+        return "\(totalMinutes)m"
+    }
+
+    func sleepTimerMinutesString(at date: Date = Date()) -> String {
+        guard let start = sleepStartTime else { return "" }
+
+        let reference: Date
+        if isSleepActive {
+            reference = date
+        } else if let end = sleepEndTime {
+            reference = end
+        } else {
+            return ""
+        }
+
+        let elapsed = max(0, reference.timeIntervalSince(start))
+        let totalMinutes = Int(elapsed) / 60
+        if totalMinutes == 0 { return "" }
+        let hours = totalMinutes / 60
+        let minutes = totalMinutes % 60
+        if hours > 0 {
+            return "\(hours)h \(minutes)m"
+        }
+        return "\(totalMinutes)m"
+    }
+
     // MARK: - Formatted Display Helpers
 
     var dateDisplayString: String {

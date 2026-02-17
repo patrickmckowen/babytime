@@ -320,8 +320,10 @@ struct AddBabyView: View {
 struct WelcomeView: View {
     @Environment(ActivityManager.self) private var activityManager
 
-    @State private var name = ""
-    @State private var birthdate = Date()
+    @State private var name = "Kaia"
+    @State private var birthdate = Calendar.current.date(
+        from: DateComponents(year: 2025, month: 10, day: 17)
+    ) ?? Date()
     @State private var bedtime = Calendar.current.date(
         from: DateComponents(hour: 19, minute: 0)
     ) ?? Date()

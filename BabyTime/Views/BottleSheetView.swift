@@ -39,7 +39,7 @@ struct BottleSheetView: View {
             }
             .padding(.horizontal, BTSpacing.pageMargin)
             .padding(.bottom, BTSpacing.pageMargin)
-            .background(Color.btBackground)
+            .background(Color.btBackgroundSecondary)
             .navigationTitle(isEditing ? "Edit Bottle" : "Bottle")
             .navigationBarTitleDisplayMode(.inline)
         }
@@ -141,7 +141,7 @@ struct BottleSheetView: View {
             .padding(.horizontal, BTSpacing.cardPaddingHorizontal)
             .padding(.vertical, 16)
         }
-        .background(Color.btBackground)
+        .background(Color.btBackgroundSecondary)
         .clipShape(RoundedRectangle(cornerRadius: BTRadius.card, style: .continuous))
         .cardShadow()
     }
@@ -160,7 +160,7 @@ struct BottleSheetView: View {
                     .foregroundStyle(Color.btTextSecondary)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 16)
-                    .background(Color.btBackground)
+                    .background(Color.btBackgroundSecondary)
                     .clipShape(Capsule())
                     .cardShadow()
             }

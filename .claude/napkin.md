@@ -67,3 +67,20 @@
 - Deferred: TodaySummaryCard, LogView, TimelineView still use legacy types
 - Deferred: MockData.swift and Activity.swift legacy types not yet removed
 - Branch: `feature/custom-feed-interval`
+
+### Fluid Transition: FeedCard → Nursing/Bottle Sheets
+- **Approach chosen:** Zoom transition (`.navigationTransition(.zoom)` + `.matchedTransitionSource`)
+- **Rejected:** Glass morph (cards use `Color.btBackground` not glass — glass is for chrome), matchedGeometryEffect (over-engineered, no free dismiss gestures)
+- **Implementation:** `@Namespace` declared in ContentView, threaded via `Namespace.ID` param through HomeView → FeedCard
+- **Source IDs:** `"nursingSheet"` on Nurse buttons, `"bottleSheet"` on Bottle buttons — both in `.nextFeed` and `.logFirstFeed` modes
+- **Sheet side:** `.presentationDetents([.large])` + `.navigationTransition(.zoom(sourceID:in:))` on sheet content
+- **Toolbar buttons:** No `matchedTransitionSource` on toolbar (avoids duplicate source ID conflicts). Toolbar triggers standard sheet presentation
+- **`.nursingActive` mode:** No `matchedTransitionSource` — the card tap opens nursing sheet with standard presentation since there's no dedicated button
+- **Known risk:** iOS 26 beta 3 has occasional glitchiness with sheet zoom transitions. Fallback: swap `.sheet` to `.fullScreenCover` if zoom is unreliable
+- **Attempt 1 status:** Compiles, not yet tested on device/simulator. Need to verify zoom animation quality
+
+### Fluid Transition: SleepCard → SleepSheetView
+- Same pattern as FeedCard: `feedTransition: Namespace.ID` threaded through HomeView → SleepCard
+- Source ID: `"sleepSheet"` on Sleep button in `awakeContent()`
+- Sleep button added to `.awake` mode only (not `.sleepActive`, `.wakeTimePrompt`, `.bedtimePrompt`, `.sleeping`)
+- `.sleepActive` mode: no `matchedTransitionSource` — standard sheet presentation (same as `.nursingActive`)

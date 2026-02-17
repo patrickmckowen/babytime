@@ -11,10 +11,13 @@ import SwiftData
 
 struct HomeView: View {
     @Environment(ActivityManager.self) private var activityManager
+    var sheetTransition: Namespace.ID
     var onNursingTap: (() -> Void)?
     var onBottleTap: (() -> Void)?
     var onSleepTap: (() -> Void)?
     var onPhotoTap: (() -> Void)?
+    var onLogTap: (() -> Void)?
+    var onSettingsTap: (() -> Void)?
 
     var body: some View {
         ScrollView {
@@ -34,7 +37,7 @@ struct HomeView: View {
                     // 3. Sleep card
                     sleepCard
 
-                    // 4. Today summary
+                    // 4. Today summary — tap navigates to Log
                     TodaySummaryCard(
                         dateString: activityManager.shortDateDisplayString,
                         ageString: activityManager.ageDisplayString,
@@ -54,6 +57,23 @@ struct HomeView: View {
                             activityManager.updateBedtime(time)
                         }
                     )
+                    .onTapGesture {
+                        onLogTap?()
+                    }
+
+                    // 5. Settings button
+                    Button {
+                        onSettingsTap?()
+                    } label: {
+                        HStack(spacing: 4) {
+                            Image(systemName: "gearshape")
+                                .font(.system(size: 13))
+                            Text("Settings")
+                                .font(.footnote)
+                        }
+                        .foregroundStyle(Color.btTextMuted)
+                    }
+                    .padding(.top, 24)
                 }
                 .padding(.top, BTSpacing.photoToCard)
                 .padding(.horizontal, BTSpacing.pageMargin)
@@ -71,11 +91,13 @@ struct HomeView: View {
         if activityManager.isNursingActive || activityManager.hasNursingSession {
             FeedCard(
                 mode: .nursingActive,
+                sheetTransition: sheetTransition,
                 onTap: onNursingTap
             )
         } else if activityManager.snapshot?.feedState == .noFeedsYet {
             FeedCard(
                 mode: .logFirstFeed,
+                sheetTransition: sheetTransition,
                 onBottleTap: onBottleTap,
                 onNurseTap: onNursingTap
             )
@@ -88,7 +110,9 @@ struct HomeView: View {
                         lastFedAgo: formatMinutes(Int(context.date.timeIntervalSince(feedRef) / 60)),
                         offerDetail: feedOfferDetail(feedRef: feedRef, now: context.date)
                     ),
-                    onTap: nil
+                    sheetTransition: sheetTransition,
+                    onBottleTap: onBottleTap,
+                    onNurseTap: onNursingTap
                 )
             }
         } else {
@@ -97,7 +121,9 @@ struct HomeView: View {
                     lastFedAgo: activityManager.timeSinceLastFeedDuration,
                     offerDetail: feedOfferDetail(feedRef: nil, now: Date())
                 ),
-                onTap: nil
+                sheetTransition: sheetTransition,
+                onBottleTap: onBottleTap,
+                onNurseTap: onNursingTap
             )
         }
     }
@@ -109,6 +135,7 @@ struct HomeView: View {
         if activityManager.isSleepActive || activityManager.hasSleepSession {
             SleepCard(
                 mode: .sleepActive,
+                sheetTransition: sheetTransition,
                 onTap: onSleepTap
             )
         } else if let snapshot = activityManager.snapshot {
@@ -117,7 +144,8 @@ struct HomeView: View {
                 SwiftUI.TimelineView(.periodic(from: .now, by: 60)) { context in
                     SleepCard(
                         mode: sleepCardMode(from: snapshot, now: context.date),
-                        onTap: nil,
+                        sheetTransition: sheetTransition,
+                        onSleepTap: onSleepTap,
                         onWakeTimeSubmit: { time in
                             activityManager.setWakeTime(time)
                         }
@@ -128,13 +156,14 @@ struct HomeView: View {
                 SwiftUI.TimelineView(.periodic(from: .now, by: 60)) { context in
                     SleepCard(
                         mode: sleepCardMode(from: snapshot, now: context.date),
-                        onTap: nil
+                        sheetTransition: sheetTransition
                     )
                 }
             } else {
                 SleepCard(
                     mode: sleepCardMode(from: snapshot),
-                    onTap: nil,
+                    sheetTransition: sheetTransition,
+                    onSleepTap: onSleepTap,
                     onWakeTimeSubmit: { time in
                         activityManager.setWakeTime(time)
                     },
@@ -146,6 +175,7 @@ struct HomeView: View {
         } else {
             SleepCard(
                 mode: .wakeTimePrompt(babyName: activityManager.babyName),
+                sheetTransition: sheetTransition,
                 onWakeTimeSubmit: { time in
                     activityManager.setWakeTime(time)
                 }
@@ -166,49 +196,42 @@ struct HomeView: View {
 
         case .awakeEarly(let mins, let range):
             return .awake(
-                label: "Awake for",
                 duration: formatMinutes(liveWakeMinutes ?? mins),
                 detail: "Nap by \(napByTimeString(snapshot: snapshot, range: range))"
             )
 
         case .awakeApproaching(let mins, let range):
             return .awake(
-                label: "Nap window open",
                 duration: formatMinutes(liveWakeMinutes ?? mins),
                 detail: "Nap by \(napByTimeString(snapshot: snapshot, range: range))"
             )
 
         case .awakeBeyond(let mins, let range):
             return .awake(
-                label: "Past wake window",
                 duration: formatMinutes(liveWakeMinutes ?? mins),
-                detail: "Due at \(napByTimeString(snapshot: snapshot, range: range))"
+                detail: "Wake window ended at \(napByTimeString(snapshot: snapshot, range: range))"
             )
 
         case .sleepingNoPressure(let mins, _):
             return .sleeping(
-                label: "Sleeping",
                 duration: formatMinutes(mins),
                 detail: "Started at \(activityManager.todaySleeps.last?.startTime.shortTime ?? "--")"
             )
 
         case .sleepingApproachingCutoff(let mins, let untilCutoff):
             return .sleeping(
-                label: "Sleeping",
                 duration: formatMinutes(mins),
                 detail: "Wake in \(formatMinutes(untilCutoff)) for bedtime"
             )
 
         case .sleepingMustEnd(let mins, _):
             return .sleeping(
-                label: "Wake her up",
                 duration: formatMinutes(mins),
                 detail: "Past cutoff for bedtime"
             )
 
         case .napWindowClosed(let mins, _):
             return .awake(
-                label: "Bridging to bedtime",
                 duration: formatMinutes(liveWakeMinutes ?? mins),
                 detail: "No more naps today"
             )
@@ -222,7 +245,6 @@ struct HomeView: View {
                 return max(0, Int(now.timeIntervalSince(nightSleep.startTime) / 60))
             }()
             return .sleeping(
-                label: "Sleeping",
                 duration: formatMinutes(liveMins),
                 detail: "Fell asleep at \(activityManager.todayNightSleep?.startTime.shortTime ?? "--")"
             )
@@ -283,6 +305,7 @@ struct HomeView: View {
 // MARK: - Preview
 
 #Preview("Home") {
+    @Previewable @Namespace var ns
     let container = try! ModelContainer(
         for: Baby.self, FeedEvent.self, SleepEvent.self, WakeEvent.self,
         configurations: ModelConfiguration(isStoredInMemoryOnly: true)
@@ -291,6 +314,6 @@ struct HomeView: View {
     let baby = manager.addBaby(name: "Kaia", birthdate: Calendar.current.date(byAdding: .day, value: -100, to: Date())!)
     manager.selectBaby(baby)
 
-    return HomeView()
+    return HomeView(sheetTransition: ns)
         .environment(manager)
 }

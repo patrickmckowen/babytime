@@ -10,6 +10,7 @@ import SwiftData
 
 struct FeedCard: View {
     let mode: Mode
+    var sheetTransition: Namespace.ID
     var onTap: (() -> Void)?
     var onBottleTap: (() -> Void)?
     var onNurseTap: (() -> Void)?
@@ -50,22 +51,49 @@ struct FeedCard: View {
         offerDetail: String
     ) -> some View {
         VStack(alignment: .leading, spacing: 0) {
-            Text("Last fed")
-                .font(BTTypography.label)
-                .tracking(BTTracking.label)
-                .foregroundStyle(Color.btTextSecondary)
-
-            Text(lastFedAgo)
+            (Text("Last ate ")
+                .foregroundStyle(Color.btTextTertiary)
+            + Text(lastFedAgo)
+                .foregroundStyle(Color.btTextPrimary))
                 .font(BTTypography.headline)
                 .tracking(BTTracking.headline)
-                .foregroundStyle(Color.btTextPrimary)
-                .padding(.top, BTSpacing.labelToHeadline)
 
             Text(offerDetail)
                 .font(BTTypography.label)
                 .tracking(BTTracking.label)
                 .foregroundStyle(Color.btTextSecondary)
                 .padding(.top, BTSpacing.headlineToDetail)
+
+            HStack(spacing: 12) {
+                Button {
+                    onNurseTap?()
+                } label: {
+                    Label("Nurse", systemImage: "drop.fill")
+                        .font(BTTypography.label)
+                        .tracking(BTTracking.label)
+                        .foregroundStyle(Color.btTextPrimary)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 12)
+                        .background(Color.btBackgroundSecondary)
+                        .clipShape(Capsule())
+                }
+                .matchedTransitionSource(id: "nursingSheet", in: sheetTransition)
+
+                Button {
+                    onBottleTap?()
+                } label: {
+                    Label("Bottle", systemImage: "waterbottle.fill")
+                        .font(BTTypography.label)
+                        .tracking(BTTracking.label)
+                        .foregroundStyle(Color.btTextPrimary)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 12)
+                        .background(Color.btBackgroundSecondary)
+                        .clipShape(Capsule())
+                }
+                .matchedTransitionSource(id: "bottleSheet", in: sheetTransition)
+            }
+            .padding(.top, 18)
         }
     }
 
@@ -102,12 +130,13 @@ struct FeedCard: View {
                     Label("Nurse", systemImage: "drop.fill")
                         .font(BTTypography.label)
                         .tracking(BTTracking.label)
-                        .foregroundStyle(.white)
+                        .foregroundStyle(Color.btTextPrimary)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 12)
-                        .background(Color.btFeedAccent)
+                        .background(Color.btBackgroundSecondary)
                         .clipShape(Capsule())
                 }
+                .matchedTransitionSource(id: "nursingSheet", in: sheetTransition)
 
                 Button {
                     onBottleTap?()
@@ -115,12 +144,13 @@ struct FeedCard: View {
                     Label("Bottle", systemImage: "waterbottle.fill")
                         .font(BTTypography.label)
                         .tracking(BTTracking.label)
-                        .foregroundStyle(.white)
+                        .foregroundStyle(Color.btTextPrimary)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 12)
-                        .background(Color.btFeedAccent)
+                        .background(Color.btBackgroundSecondary)
                         .clipShape(Capsule())
                 }
+                .matchedTransitionSource(id: "bottleSheet", in: sheetTransition)
             }
             .padding(.top, 18)
         }
@@ -132,17 +162,14 @@ struct FeedCard: View {
 
     private var nursingActiveContent: some View {
         VStack(alignment: .leading, spacing: 0) {
-            Text("Nursing")
-                .font(BTTypography.label)
-                .tracking(BTTracking.label)
-                .foregroundStyle(Color.btFeedAccent)
-
-            SwiftUI.TimelineView(.periodic(from: .now, by: 1)) { context in
-                Text(activityManager.nursingTimerString(at: context.date))
+            SwiftUI.TimelineView(.periodic(from: .now, by: 60)) { context in
+                let mins = activityManager.nursingTimerMinutesString(at: context.date)
+                (Text("Nursing")
+                    .foregroundStyle(Color.btFeedAccent)
+                + Text(mins.isEmpty ? "" : " \(mins)")
+                    .foregroundStyle(Color.btTextPrimary))
                     .font(BTTypography.headline)
                     .tracking(BTTracking.headline)
-                    .foregroundStyle(Color.btTextPrimary)
-                    .padding(.top, BTSpacing.labelToHeadline)
             }
 
             if let start = activityManager.nursingStartTime {
@@ -157,23 +184,29 @@ struct FeedCard: View {
 }
 
 #Preview("Next Feed") {
+    @Previewable @Namespace var ns
     ZStack {
         Color.btBackground.ignoresSafeArea()
         FeedCard(
             mode: .nextFeed(
                 lastFedAgo: "1h 50m",
                 offerDetail: "Offer 4oz by 3:00 PM"
-            )
+            ),
+            sheetTransition: ns,
+            onBottleTap: {},
+            onNurseTap: {}
         )
         .padding(.horizontal, BTSpacing.pageMargin)
     }
 }
 
 #Preview("Log First Feed") {
+    @Previewable @Namespace var ns
     ZStack {
         Color.btBackground.ignoresSafeArea()
         FeedCard(
             mode: .logFirstFeed,
+            sheetTransition: ns,
             onBottleTap: {},
             onNurseTap: {}
         )
@@ -182,13 +215,14 @@ struct FeedCard: View {
 }
 
 #Preview("Nursing Active") {
+    @Previewable @Namespace var ns
     let container = try! ModelContainer(
         for: Baby.self, FeedEvent.self, SleepEvent.self, WakeEvent.self,
         configurations: ModelConfiguration(isStoredInMemoryOnly: true)
     )
     ZStack {
         Color.btBackground.ignoresSafeArea()
-        FeedCard(mode: .nursingActive)
+        FeedCard(mode: .nursingActive, sheetTransition: ns)
             .padding(.horizontal, BTSpacing.pageMargin)
     }
     .environment(ActivityManager(modelContext: container.mainContext))

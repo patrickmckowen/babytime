@@ -10,6 +10,7 @@ import SwiftData
 
 struct FeedCard: View {
     let mode: Mode
+    var feedTransition: Namespace.ID
     var onTap: (() -> Void)?
     var onBottleTap: (() -> Void)?
     var onNurseTap: (() -> Void)?
@@ -66,6 +67,37 @@ struct FeedCard: View {
                 .tracking(BTTracking.label)
                 .foregroundStyle(Color.btTextSecondary)
                 .padding(.top, BTSpacing.headlineToDetail)
+
+            HStack(spacing: 12) {
+                Button {
+                    onNurseTap?()
+                } label: {
+                    Label("Nurse", systemImage: "drop.fill")
+                        .font(BTTypography.label)
+                        .tracking(BTTracking.label)
+                        .foregroundStyle(.white)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 12)
+                        .background(Color.btFeedAccent)
+                        .clipShape(Capsule())
+                }
+                .matchedTransitionSource(id: "nursingSheet", in: feedTransition)
+
+                Button {
+                    onBottleTap?()
+                } label: {
+                    Label("Bottle", systemImage: "waterbottle.fill")
+                        .font(BTTypography.label)
+                        .tracking(BTTracking.label)
+                        .foregroundStyle(.white)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 12)
+                        .background(Color.btFeedAccent)
+                        .clipShape(Capsule())
+                }
+                .matchedTransitionSource(id: "bottleSheet", in: feedTransition)
+            }
+            .padding(.top, 18)
         }
     }
 
@@ -108,6 +140,7 @@ struct FeedCard: View {
                         .background(Color.btFeedAccent)
                         .clipShape(Capsule())
                 }
+                .matchedTransitionSource(id: "nursingSheet", in: feedTransition)
 
                 Button {
                     onBottleTap?()
@@ -121,6 +154,7 @@ struct FeedCard: View {
                         .background(Color.btFeedAccent)
                         .clipShape(Capsule())
                 }
+                .matchedTransitionSource(id: "bottleSheet", in: feedTransition)
             }
             .padding(.top, 18)
         }
@@ -157,23 +191,29 @@ struct FeedCard: View {
 }
 
 #Preview("Next Feed") {
+    @Previewable @Namespace var ns
     ZStack {
         Color.btBackground.ignoresSafeArea()
         FeedCard(
             mode: .nextFeed(
                 lastFedAgo: "1h 50m",
                 offerDetail: "Offer 4oz by 3:00 PM"
-            )
+            ),
+            feedTransition: ns,
+            onBottleTap: {},
+            onNurseTap: {}
         )
         .padding(.horizontal, BTSpacing.pageMargin)
     }
 }
 
 #Preview("Log First Feed") {
+    @Previewable @Namespace var ns
     ZStack {
         Color.btBackground.ignoresSafeArea()
         FeedCard(
             mode: .logFirstFeed,
+            feedTransition: ns,
             onBottleTap: {},
             onNurseTap: {}
         )
@@ -182,13 +222,14 @@ struct FeedCard: View {
 }
 
 #Preview("Nursing Active") {
+    @Previewable @Namespace var ns
     let container = try! ModelContainer(
         for: Baby.self, FeedEvent.self, SleepEvent.self, WakeEvent.self,
         configurations: ModelConfiguration(isStoredInMemoryOnly: true)
     )
     ZStack {
         Color.btBackground.ignoresSafeArea()
-        FeedCard(mode: .nursingActive)
+        FeedCard(mode: .nursingActive, feedTransition: ns)
             .padding(.horizontal, BTSpacing.pageMargin)
     }
     .environment(ActivityManager(modelContext: container.mainContext))

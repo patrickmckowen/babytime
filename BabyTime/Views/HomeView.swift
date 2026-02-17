@@ -11,6 +11,7 @@ import SwiftData
 
 struct HomeView: View {
     @Environment(ActivityManager.self) private var activityManager
+    var feedTransition: Namespace.ID
     var onNursingTap: (() -> Void)?
     var onBottleTap: (() -> Void)?
     var onSleepTap: (() -> Void)?
@@ -71,11 +72,13 @@ struct HomeView: View {
         if activityManager.isNursingActive || activityManager.hasNursingSession {
             FeedCard(
                 mode: .nursingActive,
+                feedTransition: feedTransition,
                 onTap: onNursingTap
             )
         } else if activityManager.snapshot?.feedState == .noFeedsYet {
             FeedCard(
                 mode: .logFirstFeed,
+                feedTransition: feedTransition,
                 onBottleTap: onBottleTap,
                 onNurseTap: onNursingTap
             )
@@ -88,7 +91,9 @@ struct HomeView: View {
                         lastFedAgo: formatMinutes(Int(context.date.timeIntervalSince(feedRef) / 60)),
                         offerDetail: feedOfferDetail(feedRef: feedRef, now: context.date)
                     ),
-                    onTap: nil
+                    feedTransition: feedTransition,
+                    onBottleTap: onBottleTap,
+                    onNurseTap: onNursingTap
                 )
             }
         } else {
@@ -97,7 +102,9 @@ struct HomeView: View {
                     lastFedAgo: activityManager.timeSinceLastFeedDuration,
                     offerDetail: feedOfferDetail(feedRef: nil, now: Date())
                 ),
-                onTap: nil
+                feedTransition: feedTransition,
+                onBottleTap: onBottleTap,
+                onNurseTap: onNursingTap
             )
         }
     }
@@ -283,6 +290,7 @@ struct HomeView: View {
 // MARK: - Preview
 
 #Preview("Home") {
+    @Previewable @Namespace var ns
     let container = try! ModelContainer(
         for: Baby.self, FeedEvent.self, SleepEvent.self, WakeEvent.self,
         configurations: ModelConfiguration(isStoredInMemoryOnly: true)
@@ -291,6 +299,6 @@ struct HomeView: View {
     let baby = manager.addBaby(name: "Kaia", birthdate: Calendar.current.date(byAdding: .day, value: -100, to: Date())!)
     manager.selectBaby(baby)
 
-    return HomeView()
+    return HomeView(feedTransition: ns)
         .environment(manager)
 }

@@ -19,6 +19,7 @@ struct ContentView: View {
     @State private var showSettings = false
     @State private var selectedPhoto: PhotosPickerItem?
     @State private var showPhotoPicker = false
+    @Namespace private var feedTransition
     @State private var showLog = false
 
     var body: some View {
@@ -26,6 +27,7 @@ struct ContentView: View {
             Group {
                 if activityManager.baby != nil {
                     HomeView(
+                        feedTransition: feedTransition,
                         onNursingTap: { showNursingSheet = true },
                         onBottleTap: { showBottleSheet = true },
                         onSleepTap: { showSleepSheet = true },
@@ -107,9 +109,13 @@ struct ContentView: View {
         }
         .sheet(isPresented: $showNursingSheet) {
             NursingSheetView()
+                .presentationDetents([.large])
+                .navigationTransition(.zoom(sourceID: "nursingSheet", in: feedTransition))
         }
         .sheet(isPresented: $showBottleSheet) {
             BottleSheetView()
+                .presentationDetents([.large])
+                .navigationTransition(.zoom(sourceID: "bottleSheet", in: feedTransition))
         }
         .sheet(isPresented: $showSleepSheet) {
             SleepSheetView()

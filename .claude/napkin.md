@@ -68,8 +68,7 @@
 - Phase 3+4 complete: Settings screen + UI wiring
 - Phase 5 complete: ActivityLogView — grouped-by-day, tap to edit, swipe to delete, calendar button in BabyPhotoHeader
 - Not using bottle source (breastMilk vs formula) in display — user preference
-- Deferred: TodaySummaryCard, LogView, TimelineView still use legacy types
-- Deferred: MockData.swift and Activity.swift legacy types not yet removed
+- Cleaned up: MockData.swift, Activity.swift, LogView.swift, TimelineView.swift all removed (dead code). TodaySummaryCard uses SwiftData models only
 - Branch: `feature/custom-feed-interval`
 
 ### Fluid Transition: FeedCard → Nursing/Bottle Sheets

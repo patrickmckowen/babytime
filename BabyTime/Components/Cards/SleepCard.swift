@@ -52,6 +52,11 @@ struct SleepCard: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Color.btBackground)
         .clipShape(RoundedRectangle(cornerRadius: BTRadius.card, style: .continuous))
+        .matchedTransitionSource(id: "sleepSheet", in: sheetTransition) { source in
+            source
+                .background(Color.btBackground)
+                .clipShape(RoundedRectangle(cornerRadius: BTRadius.card, style: .continuous))
+        }
         .cardShadow()
         .onTapGesture {
             onTap?()
@@ -96,7 +101,6 @@ struct SleepCard: View {
                     .background(Color.btBackgroundSecondary)
                     .clipShape(Capsule())
             }
-            .matchedTransitionSource(id: "sleepSheet", in: sheetTransition)
             .padding(.top, 18)
         }
     }

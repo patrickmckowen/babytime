@@ -32,16 +32,27 @@ struct BottleSheetView: View {
 
                 // Controls card
                 controlsCard
-
-                // Cancel / Save buttons
-                actionButtons
-                    .padding(.top, 24)
             }
             .padding(.horizontal, BTSpacing.pageMargin)
-            .padding(.bottom, BTSpacing.pageMargin)
-            .background(Color.btBackgroundSecondary)
-            .navigationTitle(isEditing ? "Edit Bottle" : "Bottle")
-            .navigationBarTitleDisplayMode(.inline)
+            .background(Color.btBackground)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button(role: .cancel) {
+                        dismiss()
+                    }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button(role: .confirm) {
+                        if let event = editingEvent {
+                            activityManager.updateFeedEvent(event, amountOz: amountOz, at: selectedTime)
+                        } else {
+                            activityManager.saveBottle(amountOz: amountOz, at: selectedTime)
+                        }
+                        dismiss()
+                    }
+                    .tint(Color.btFeedAccent)
+                }
+            }
         }
         .onAppear {
             if let event = editingEvent {
@@ -56,7 +67,7 @@ struct BottleSheetView: View {
     private var amountDisplay: some View {
         VStack(spacing: 8) {
             Text(formattedAmount)
-                .font(.system(size: 64, weight: .regular, design: .default))
+                .font(.system(size: 72, weight: .regular, design: .default))
                 .monospacedDigit()
                 .tracking(-2)
                 .foregroundStyle(Color.btTextPrimary)
@@ -116,14 +127,12 @@ struct BottleSheetView: View {
                         .foregroundStyle(Color.btTextSecondary)
                 }
             }
-            .padding(.horizontal, BTSpacing.cardPaddingHorizontal)
             .padding(.vertical, 20)
 
             // Divider
             Rectangle()
                 .fill(Color.btDivider)
                 .frame(height: 1)
-                .padding(.horizontal, BTSpacing.cardPaddingHorizontal)
 
             // Time row
             HStack {
@@ -138,54 +147,10 @@ struct BottleSheetView: View {
                     .labelsHidden()
                     .tint(Color.btFeedAccent)
             }
-            .padding(.horizontal, BTSpacing.cardPaddingHorizontal)
             .padding(.vertical, 16)
         }
-        .background(Color.btBackgroundSecondary)
-        .clipShape(RoundedRectangle(cornerRadius: BTRadius.card, style: .continuous))
-        .cardShadow()
     }
 
-    // MARK: - Action Buttons
-
-    private var actionButtons: some View {
-        HStack(spacing: 14) {
-            // Cancel
-            Button {
-                dismiss()
-            } label: {
-                Text("Cancel")
-                    .font(BTTypography.label)
-                    .tracking(BTTracking.label)
-                    .foregroundStyle(Color.btTextSecondary)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 16)
-                    .background(Color.btBackgroundSecondary)
-                    .clipShape(Capsule())
-                    .cardShadow()
-            }
-
-            // Save
-            Button {
-                if let event = editingEvent {
-                    activityManager.updateFeedEvent(event, amountOz: amountOz, at: selectedTime)
-                } else {
-                    activityManager.saveBottle(amountOz: amountOz, at: selectedTime)
-                }
-                dismiss()
-            } label: {
-                Text("Save")
-                    .font(BTTypography.label)
-                    .tracking(BTTracking.label)
-                    .foregroundStyle(.white)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 16)
-                    .background(Color.btFeedAccent)
-                    .clipShape(Capsule())
-                    .cardShadow()
-            }
-        }
-    }
 }
 
 #Preview {

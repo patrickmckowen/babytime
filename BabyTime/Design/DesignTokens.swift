@@ -121,6 +121,13 @@ enum BTRadius {
     static let iconContainer: CGFloat = 10
 }
 
+// MARK: - Shadow
+
+enum BTShadow {
+    /// Base shadow color — #2C2520
+    static let color = Color(red: 0.173, green: 0.145, blue: 0.125)
+}
+
 // MARK: - Icon Sizes
 
 enum BTIconSize {

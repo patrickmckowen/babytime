@@ -41,9 +41,8 @@ struct SleepSheetView: View {
         return activityManager.hasSleepSession || (draftStartTime != nil && draftEndTime != nil)
     }
 
-    private var canReset: Bool {
-        if isEditing { return false }
-        return activityManager.hasSleepSession || draftStartTime != nil || draftEndTime != nil
+    private var showReset: Bool {
+        !isEditing && activityManager.hasSleepSession && !activityManager.isSleepActive
     }
 
     private var isPickerRecentlyActive: Bool {
@@ -54,7 +53,7 @@ struct SleepSheetView: View {
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
-                // Timer tap target — entire area from navbar to timesList
+                // Timer tap target
                 VStack {
                     Spacer()
                     timerDisplay
@@ -69,24 +68,30 @@ struct SleepSheetView: View {
 
                 // Start / End time rows (always visible)
                 timesList
-
-                // Reset / Save buttons
-                actionButtons
-                    .padding(.top, 24)
             }
             .padding(.horizontal, BTSpacing.pageMargin)
-            .padding(.bottom, BTSpacing.pageMargin)
-            .background(Color.btBackgroundSecondary)
-            .navigationTitle(isEditing ? "Edit Sleep" : "Sleep")
-            .navigationBarTitleDisplayMode(.inline)
+            .background(Color.btBackground)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button {
                         dismiss()
                     } label: {
                         Image(systemName: "chevron.down")
-                            .fontWeight(.semibold)
                     }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button(role: .confirm) {
+                        if let event = editingEvent, let start = draftStartTime, let end = draftEndTime {
+                            activityManager.updateSleepEvent(event, startTime: start, endTime: end)
+                        } else if activityManager.hasSleepSession {
+                            activityManager.saveSleep()
+                        } else if let start = draftStartTime, let end = draftEndTime {
+                            activityManager.saveSleepManual(startTime: start, endTime: end)
+                        }
+                        dismiss()
+                    }
+                    .tint(Color.btSleepAccent)
+                    .disabled(!canSave)
                 }
             }
         }
@@ -139,7 +144,7 @@ struct SleepSheetView: View {
         VStack(spacing: 8) {
             SwiftUI.TimelineView(.periodic(from: .now, by: 1)) { context in
                 Text(durationString(at: context.date))
-                    .font(.system(size: 64, weight: .regular, design: .default))
+                    .font(.system(size: 72, weight: .regular, design: .default))
                     .monospacedDigit()
                     .tracking(-2)
                     .foregroundStyle(Color.btTextPrimary)
@@ -177,6 +182,19 @@ struct SleepSheetView: View {
 
                 Spacer()
 
+                Button {
+                    activityManager.resetSleep()
+                    draftStartTime = nil
+                    draftEndTime = nil
+                } label: {
+                    Image(systemName: "arrow.counterclockwise")
+                        .font(.system(size: 17, weight: .medium))
+                        .foregroundStyle(Color.btTextPrimary)
+                }
+                .opacity(showReset ? 1 : 0)
+                .allowsHitTesting(showReset)
+                .padding(.trailing, 16)
+
                 DatePicker(
                     "",
                     selection: startTimeBinding,
@@ -207,27 +225,10 @@ struct SleepSheetView: View {
                     displayedComponents: [.hourAndMinute]
                 )
                 .labelsHidden()
-                .disabled(!isEditing && activityManager.isSleepActive)
-                .opacity(!isEditing && activityManager.isSleepActive ? 0.0 : 1.0)
-                .overlay {
-                    if !isEditing && activityManager.isSleepActive {
-                        Text("—")
-                            .font(.subheadline.weight(.medium))
-                            .foregroundStyle(Color.btTextSecondary.opacity(0.4))
-                            .frame(maxWidth: .infinity, alignment: .trailing)
-                    }
-                }
-                .simultaneousGesture(TapGesture().onEnded {
-                    guard isEditing || !activityManager.isSleepActive else { return }
-                    pickerInteractionDate = Date()
-                })
+                .simultaneousGesture(TapGesture().onEnded { pickerInteractionDate = Date() })
             }
             .padding(.vertical, 14)
         }
-        .padding(.horizontal, BTSpacing.cardPaddingHorizontal)
-        .background(Color.btBackgroundSecondary)
-        .clipShape(RoundedRectangle(cornerRadius: BTRadius.card, style: .continuous))
-        .cardShadow()
         .padding(.vertical, 4)
     }
 
@@ -243,6 +244,8 @@ struct SleepSheetView: View {
                     activityManager.sleepStartTime = newValue
                 } else {
                     draftStartTime = newValue
+                    // Auto-initialize end time so duration displays and save enables
+                    if draftEndTime == nil { draftEndTime = Date() }
                 }
             }
         )
@@ -258,59 +261,13 @@ struct SleepSheetView: View {
                     activityManager.sleepEndTime = newValue
                 } else {
                     draftEndTime = newValue
+                    // Auto-initialize start time so duration displays and save enables
+                    if draftStartTime == nil { draftStartTime = Date() }
                 }
             }
         )
     }
 
-    // MARK: - Action Buttons
-
-    private var actionButtons: some View {
-        HStack(spacing: 14) {
-            Button {
-                if isEditing {
-                    dismiss()
-                } else {
-                    activityManager.resetSleep()
-                    draftStartTime = nil
-                    draftEndTime = nil
-                }
-            } label: {
-                Text(isEditing ? "Cancel" : "Reset")
-                    .font(BTTypography.label)
-                    .tracking(BTTracking.label)
-                    .foregroundStyle(Color.btTextSecondary)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 16)
-                    .background(Color.btBackgroundSecondary)
-                    .clipShape(Capsule())
-                    .cardShadow()
-            }
-            .disabled(!isEditing && !canReset)
-
-            Button {
-                if let event = editingEvent, let start = draftStartTime, let end = draftEndTime {
-                    activityManager.updateSleepEvent(event, startTime: start, endTime: end)
-                } else if activityManager.hasSleepSession {
-                    activityManager.saveSleep()
-                } else if let start = draftStartTime, let end = draftEndTime {
-                    activityManager.saveSleepManual(startTime: start, endTime: end)
-                }
-                dismiss()
-            } label: {
-                Text("Save")
-                    .font(BTTypography.label)
-                    .tracking(BTTracking.label)
-                    .foregroundStyle(.white)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 16)
-                    .background(Color.btSleepAccent)
-                    .clipShape(Capsule())
-                    .cardShadow()
-            }
-            .disabled(!canSave)
-        }
-    }
 }
 
 #Preview {

@@ -39,8 +39,7 @@ struct HomeView: View {
 
                     // 4. Today summary — tap navigates to Log
                     TodaySummaryCard(
-                        dateString: activityManager.shortDateDisplayString,
-                        ageString: activityManager.ageDisplayString,
+                        dateString: activityManager.dayOfWeekString,
                         totalSleep: activityManager.totalSleepFormatted,
                         longestSleep: activityManager.longestSleepFormatted,
                         napCount: activityManager.napCount,
@@ -262,10 +261,12 @@ struct HomeView: View {
     }
 
     private func feedOfferDetail(feedRef: Date?, now: Date) -> String {
-        // When asleep for the night with dream feed enabled, show dream feed time
-        if activityManager.isAsleepForNight,
-           let dreamFeedTime = activityManager.dreamFeedTimeFormatted {
-            return "Dream feed at \(dreamFeedTime)"
+        // When asleep for the night, suppress standard offer
+        if activityManager.isAsleepForNight {
+            if let dreamFeedTime = activityManager.dreamFeedTimeFormatted {
+                return "Dream feed at \(dreamFeedTime)"
+            }
+            return "Sweet dreams"
         }
         // Standard offer detail
         if let feedRef {
@@ -288,7 +289,8 @@ struct HomeView: View {
         guard let ref = snapshot.wakeReference else {
             return "\(formatMinutes(range.lowerBound))\u{2013}\(formatMinutes(range.upperBound))"
         }
-        let napBy = ref.addingTimeInterval(Double(range.upperBound) * 60)
+        let wakeWindowEnd = ref.addingTimeInterval(Double(range.upperBound) * 60)
+        let napBy = min(wakeWindowEnd, snapshot.napCutoff)
         return napBy.shortTime
     }
 

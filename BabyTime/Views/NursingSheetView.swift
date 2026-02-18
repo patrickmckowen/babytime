@@ -36,14 +36,13 @@ struct NursingSheetView: View {
         return activityManager.nursingEndTime ?? draftEndTime
     }
 
+    private var showReset: Bool {
+        !isEditing && activityManager.hasNursingSession && !activityManager.isNursingActive
+    }
+
     private var canSave: Bool {
         if isEditing { return draftStartTime != nil && draftEndTime != nil }
         return activityManager.hasNursingSession || (draftStartTime != nil && draftEndTime != nil)
-    }
-
-    private var canReset: Bool {
-        if isEditing { return false }
-        return activityManager.hasNursingSession || draftStartTime != nil || draftEndTime != nil
     }
 
     private var isPickerRecentlyActive: Bool {
@@ -54,7 +53,7 @@ struct NursingSheetView: View {
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
-                // Timer tap target — entire area from navbar to timesList
+                // Timer tap target
                 VStack {
                     Spacer()
                     timerDisplay
@@ -69,24 +68,30 @@ struct NursingSheetView: View {
 
                 // Start / End time rows (always visible)
                 timesList
-
-                // Reset / Save buttons
-                actionButtons
-                    .padding(.top, 24)
             }
             .padding(.horizontal, BTSpacing.pageMargin)
-            .padding(.bottom, BTSpacing.pageMargin)
-            .background(Color.btBackgroundSecondary)
-            .navigationTitle(isEditing ? "Edit Nursing" : "Nursing")
-            .navigationBarTitleDisplayMode(.inline)
+            .background(Color.btBackground)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button {
                         dismiss()
                     } label: {
                         Image(systemName: "chevron.down")
-                            .fontWeight(.semibold)
                     }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button(role: .confirm) {
+                        if let event = editingEvent, let start = draftStartTime, let end = draftEndTime {
+                            activityManager.updateNursingEvent(event, startTime: start, endTime: end, side: event.side)
+                        } else if activityManager.hasNursingSession {
+                            activityManager.saveNursing()
+                        } else if let start = draftStartTime, let end = draftEndTime {
+                            activityManager.saveNursingManual(startTime: start, endTime: end)
+                        }
+                        dismiss()
+                    }
+                    .tint(Color.btFeedAccent)
+                    .disabled(!canSave)
                 }
             }
         }
@@ -136,7 +141,7 @@ struct NursingSheetView: View {
         VStack(spacing: 8) {
             SwiftUI.TimelineView(.periodic(from: .now, by: 1)) { context in
                 Text(durationString(at: context.date))
-                    .font(.system(size: 64, weight: .regular, design: .default))
+                    .font(.system(size: 72, weight: .regular, design: .default))
                     .monospacedDigit()
                     .tracking(-2)
                     .foregroundStyle(Color.btTextPrimary)
@@ -174,6 +179,19 @@ struct NursingSheetView: View {
 
                 Spacer()
 
+                Button {
+                    activityManager.resetNursing()
+                    draftStartTime = nil
+                    draftEndTime = nil
+                } label: {
+                    Image(systemName: "arrow.counterclockwise")
+                        .font(.system(size: 17, weight: .medium))
+                        .foregroundStyle(Color.btTextPrimary)
+                }
+                .opacity(showReset ? 1 : 0)
+                .allowsHitTesting(showReset)
+                .padding(.trailing, 16)
+
                 DatePicker(
                     "",
                     selection: startTimeBinding,
@@ -204,27 +222,10 @@ struct NursingSheetView: View {
                     displayedComponents: [.hourAndMinute]
                 )
                 .labelsHidden()
-                .disabled(!isEditing && activityManager.isNursingActive)
-                .opacity(!isEditing && activityManager.isNursingActive ? 0.0 : 1.0)
-                .overlay {
-                    if !isEditing && activityManager.isNursingActive {
-                        Text("—")
-                            .font(.subheadline.weight(.medium))
-                            .foregroundStyle(Color.btTextSecondary.opacity(0.4))
-                            .frame(maxWidth: .infinity, alignment: .trailing)
-                    }
-                }
-                .simultaneousGesture(TapGesture().onEnded {
-                    guard isEditing || !activityManager.isNursingActive else { return }
-                    pickerInteractionDate = Date()
-                })
+                .simultaneousGesture(TapGesture().onEnded { pickerInteractionDate = Date() })
             }
             .padding(.vertical, 14)
         }
-        .padding(.horizontal, BTSpacing.cardPaddingHorizontal)
-        .background(Color.btBackgroundSecondary)
-        .clipShape(RoundedRectangle(cornerRadius: BTRadius.card, style: .continuous))
-        .cardShadow()
         .padding(.vertical, 4)
     }
 
@@ -264,54 +265,6 @@ struct NursingSheetView: View {
         )
     }
 
-    // MARK: - Action Buttons
-
-    private var actionButtons: some View {
-        HStack(spacing: 14) {
-            Button {
-                if isEditing {
-                    dismiss()
-                } else {
-                    activityManager.resetNursing()
-                    draftStartTime = nil
-                    draftEndTime = nil
-                }
-            } label: {
-                Text(isEditing ? "Cancel" : "Reset")
-                    .font(BTTypography.label)
-                    .tracking(BTTracking.label)
-                    .foregroundStyle(Color.btTextSecondary)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 16)
-                    .background(Color.btBackgroundSecondary)
-                    .clipShape(Capsule())
-                    .cardShadow()
-            }
-            .disabled(!isEditing && !canReset)
-
-            Button {
-                if let event = editingEvent, let start = draftStartTime, let end = draftEndTime {
-                    activityManager.updateNursingEvent(event, startTime: start, endTime: end, side: event.side)
-                } else if activityManager.hasNursingSession {
-                    activityManager.saveNursing()
-                } else if let start = draftStartTime, let end = draftEndTime {
-                    activityManager.saveNursingManual(startTime: start, endTime: end)
-                }
-                dismiss()
-            } label: {
-                Text("Save")
-                    .font(BTTypography.label)
-                    .tracking(BTTracking.label)
-                    .foregroundStyle(.white)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 16)
-                    .background(Color.btFeedAccent)
-                    .clipShape(Capsule())
-                    .cardShadow()
-            }
-            .disabled(!canSave)
-        }
-    }
 }
 
 #Preview {

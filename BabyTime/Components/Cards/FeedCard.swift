@@ -38,6 +38,11 @@ struct FeedCard: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Color.btBackground)
         .clipShape(RoundedRectangle(cornerRadius: BTRadius.card, style: .continuous))
+        .matchedTransitionSource(id: "feedSheet", in: sheetTransition) { source in
+            source
+                .background(Color.btBackground)
+                .clipShape(RoundedRectangle(cornerRadius: BTRadius.card, style: .continuous))
+        }
         .cardShadow()
         .onTapGesture {
             onTap?()
@@ -68,30 +73,36 @@ struct FeedCard: View {
                 Button {
                     onNurseTap?()
                 } label: {
-                    Label("Nurse", systemImage: "drop.fill")
-                        .font(BTTypography.label)
-                        .tracking(BTTracking.label)
+                    HStack(spacing: 6) {
+                            BTIcon(kind: .nursing)
+                                .frame(width: 16, height: 16)
+                            Text("Nurse")
+                                .font(BTTypography.label)
+                                .tracking(BTTracking.label)
+                        }
                         .foregroundStyle(Color.btTextPrimary)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 12)
                         .background(Color.btBackgroundSecondary)
                         .clipShape(Capsule())
                 }
-                .matchedTransitionSource(id: "nursingSheet", in: sheetTransition)
 
                 Button {
                     onBottleTap?()
                 } label: {
-                    Label("Bottle", systemImage: "waterbottle.fill")
-                        .font(BTTypography.label)
-                        .tracking(BTTracking.label)
+                    HStack(spacing: 6) {
+                            BTIcon(kind: .bottle)
+                                .frame(width: 16, height: 16)
+                            Text("Bottle")
+                                .font(BTTypography.label)
+                                .tracking(BTTracking.label)
+                        }
                         .foregroundStyle(Color.btTextPrimary)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 12)
                         .background(Color.btBackgroundSecondary)
                         .clipShape(Capsule())
                 }
-                .matchedTransitionSource(id: "bottleSheet", in: sheetTransition)
             }
             .padding(.top, 18)
         }
@@ -127,30 +138,36 @@ struct FeedCard: View {
                 Button {
                     onNurseTap?()
                 } label: {
-                    Label("Nurse", systemImage: "drop.fill")
-                        .font(BTTypography.label)
-                        .tracking(BTTracking.label)
+                    HStack(spacing: 6) {
+                            BTIcon(kind: .nursing)
+                                .frame(width: 16, height: 16)
+                            Text("Nurse")
+                                .font(BTTypography.label)
+                                .tracking(BTTracking.label)
+                        }
                         .foregroundStyle(Color.btTextPrimary)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 12)
                         .background(Color.btBackgroundSecondary)
                         .clipShape(Capsule())
                 }
-                .matchedTransitionSource(id: "nursingSheet", in: sheetTransition)
 
                 Button {
                     onBottleTap?()
                 } label: {
-                    Label("Bottle", systemImage: "waterbottle.fill")
-                        .font(BTTypography.label)
-                        .tracking(BTTracking.label)
+                    HStack(spacing: 6) {
+                            BTIcon(kind: .bottle)
+                                .frame(width: 16, height: 16)
+                            Text("Bottle")
+                                .font(BTTypography.label)
+                                .tracking(BTTracking.label)
+                        }
                         .foregroundStyle(Color.btTextPrimary)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 12)
                         .background(Color.btBackgroundSecondary)
                         .clipShape(Capsule())
                 }
-                .matchedTransitionSource(id: "bottleSheet", in: sheetTransition)
             }
             .padding(.top, 18)
         }

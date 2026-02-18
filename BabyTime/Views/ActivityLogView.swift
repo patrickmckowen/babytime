@@ -193,9 +193,9 @@ private struct LogRow: View {
 
     var body: some View {
         HStack(spacing: 14) {
-            Image(systemName: iconName)
-                .font(.system(size: 16))
+            BTIcon(kind: iconKind)
                 .foregroundStyle(iconColor)
+                .frame(width: 16, height: 16)
                 .frame(width: 28)
 
             VStack(alignment: .leading, spacing: 3) {
@@ -219,12 +219,12 @@ private struct LogRow: View {
         .padding(.vertical, 14)
     }
 
-    private var iconName: String {
+    private var iconKind: BTIcon.Kind {
         switch entry {
         case .feed(let e):
-            return e.kind == .nursing ? "drop.fill" : "waterbottle.fill"
+            return e.kind == .nursing ? .nursing : .bottle
         case .sleep:
-            return "moon.zzz.fill"
+            return .sleep
         }
     }
 

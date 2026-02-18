@@ -16,6 +16,10 @@
 | 2026-02-14 | user | Bottle source (breastMilk vs formula) not used in display | Don't include "of Breast Milk" in activity descriptions |
 | 2026-02-15 | self | DatePicker shows `?? Date()` default but `@State` draft stays nil until user interacts | When one draft time is set, auto-initialize the companion to `Date()` so displayed value matches internal state |
 | 2026-02-15 | self | Running `xcodebuild test` without `-only-testing` included BabyTimeUITests, which spawns simulator clones per UI config (runsForEachTargetApplicationUIConfiguration) and OOM'd the machine | ALWAYS use `-only-testing:BabyTimeTests`. Never run BabyTimeUITests. See CLAUDE.md Testing section and xcodebuildmcp guide.md |
+| 2026-02-17 | self | Tried to extract `matchedTransitionSource` config closure into a static func with `MatchedTransitionSourceConfiguration.Source` type | `Source` is not a member type of the protocol — opaque return types. Keep closure inline, reference design tokens within it |
+| 2026-02-17 | self+user | Shadow flash on zoom transition — `.cardShadow()` before `.matchedTransitionSource` caused shadow to disappear/reappear during animation | Apply `.cardShadow()` AFTER `.matchedTransitionSource`. Don't duplicate shadow in config closure — only `.background()` and `.clipShape()`. The config `.shadow()` renders on a different backing layer than `View.shadow()`, causing the flash. See ios-fluid-components gotchas.md |
+| 2026-02-17 | user | SleepSheetView manual logging broken — draft time bindings didn't auto-initialize companion time | When duplicating sheet patterns, verify ALL branches of binding setters are copied — the no-session else branch with auto-init is easy to miss |
+| 2026-02-17 | self | napByTimeString() computed "Nap by X" from wakeReference + currentWW.upperBound without clamping to napCutoff — suggested naps 30 min before bedtime | When DayEngine exposes a boundary (napCutoff, bedtime), the UI MUST respect it. Don't recompute from raw inputs when a pre-computed limit exists on the snapshot |
 
 ## User Preferences
 - Ask questions, don't guess or assume
@@ -72,15 +76,15 @@
 - **Approach chosen:** Zoom transition (`.navigationTransition(.zoom)` + `.matchedTransitionSource`)
 - **Rejected:** Glass morph (cards use `Color.btBackground` not glass — glass is for chrome), matchedGeometryEffect (over-engineered, no free dismiss gestures)
 - **Implementation:** `@Namespace` declared in ContentView, threaded via `Namespace.ID` param through HomeView → FeedCard
-- **Source IDs:** `"nursingSheet"` on Nurse buttons, `"bottleSheet"` on Bottle buttons — both in `.nextFeed` and `.logFirstFeed` modes
-- **Sheet side:** `.presentationDetents([.large])` + `.navigationTransition(.zoom(sourceID:in:))` on sheet content
-- **Toolbar buttons:** No `matchedTransitionSource` on toolbar (avoids duplicate source ID conflicts). Toolbar triggers standard sheet presentation
-- **`.nursingActive` mode:** No `matchedTransitionSource` — the card tap opens nursing sheet with standard presentation since there's no dedicated button
+- **Source ID:** `"feedSheet"` on the **card container** (not buttons) — shared by both nursing and bottle sheets since they originate from the same card
+- **Why card-level:** Buttons disappear when timer is active (`.nursingActive` mode), breaking the zoom-back animation. Card container is always visible across all modes.
+- **Sheet side:** `.presentationDetents([.medium, .large])` + `.navigationTransition(.zoom(sourceID: "feedSheet", in:))` on both NursingSheetView and BottleSheetView
+- **Two sheets, one sourceID:** Safe because only one sheet is presented at a time. System resolves matchedTransitionSource at present/dismiss time.
+- **Active timer tap:** Card tap in `.nursingActive` mode now also gets zoom transition since the card container is the source
 - **Known risk:** iOS 26 beta 3 has occasional glitchiness with sheet zoom transitions. Fallback: swap `.sheet` to `.fullScreenCover` if zoom is unreliable
-- **Attempt 1 status:** Compiles, not yet tested on device/simulator. Need to verify zoom animation quality
 
 ### Fluid Transition: SleepCard → SleepSheetView
-- Same pattern as FeedCard: `feedTransition: Namespace.ID` threaded through HomeView → SleepCard
-- Source ID: `"sleepSheet"` on Sleep button in `awakeContent()`
-- Sleep button added to `.awake` mode only (not `.sleepActive`, `.wakeTimePrompt`, `.bedtimePrompt`, `.sleeping`)
-- `.sleepActive` mode: no `matchedTransitionSource` — standard sheet presentation (same as `.nursingActive`)
+- **Source ID:** `"sleepSheet"` on the **card container** (not the Sleep button)
+- **Why card-level:** Same reason as feed — Sleep button disappears in `.sleepActive` mode
+- Card container always visible across all modes (`.awake`, `.sleepActive`, `.sleeping`, `.wakeTimePrompt`, `.bedtimePrompt`)
+- Active timer tap in `.sleepActive` mode now also gets zoom transition

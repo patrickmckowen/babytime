@@ -52,6 +52,11 @@ struct SleepCard: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Color.btBackground)
         .clipShape(RoundedRectangle(cornerRadius: BTRadius.card, style: .continuous))
+        .matchedTransitionSource(id: "sleepSheet", in: sheetTransition) { source in
+            source
+                .background(Color.btBackground)
+                .clipShape(RoundedRectangle(cornerRadius: BTRadius.card, style: .continuous))
+        }
         .cardShadow()
         .onTapGesture {
             onTap?()
@@ -83,16 +88,19 @@ struct SleepCard: View {
             Button {
                 onSleepTap?()
             } label: {
-                Label("Sleep", systemImage: "moon.zzz.fill")
-                    .font(BTTypography.label)
-                    .tracking(BTTracking.label)
+                HStack(spacing: 6) {
+                        BTIcon(kind: .sleep)
+                            .frame(width: 16, height: 16)
+                        Text("Sleep")
+                            .font(BTTypography.label)
+                            .tracking(BTTracking.label)
+                    }
                     .foregroundStyle(Color.btTextPrimary)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 12)
                     .background(Color.btBackgroundSecondary)
                     .clipShape(Capsule())
             }
-            .matchedTransitionSource(id: "sleepSheet", in: sheetTransition)
             .padding(.top, 18)
         }
     }

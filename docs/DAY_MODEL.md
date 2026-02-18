@@ -1,201 +1,168 @@
 # BabyTime Day Model
 
-## Philosophy
-
-The app does not plan the day. It reacts to what's actually happening and tells you what it means for what's left. Babies are unpredictable. The model embraces that — it never makes a parent feel behind schedule, because there is no schedule. There are only anchors, constraints, and the current moment.
+The app does not plan the day. It reacts to what's logged, tells you what it means for what's left, and works backward from bedtime. There is no schedule — only anchors, constraints, and the current moment.
 
 ## Inputs
 
-Three settings. That's it.
-
 | Input | Type | Purpose |
 |---|---|---|
-| **Bedtime** | Time (e.g., 7:00 PM) | The one fixed anchor. Means "put down at this time." |
-| **Baby's birthday** | Date | Derives age, which drives all targets. |
-| **Dream feed** | Toggle + time (optional) | For parents who do a late feed after baby is asleep. |
+| **Baby's birthday** | Date | Derives age → drives all targets via `AgeTable` |
+| **Bedtime** | Time (e.g., 7:00 PM) | Fixed anchor. All nap cutoff and end-of-day logic works backward from this. |
+| **Wake time** | Time (optional, per day) | Explicit morning wake. Used as wake reference when no sleep events exist yet. |
+| **Custom feed interval** | Minutes (optional, 0 = use age default) | Overrides the age-based feed interval on `Baby.customFeedIntervalMinutes`. |
+| **Dream feed** | Toggle + time (optional) | Late feed reminder after baby is asleep for the night. Does not affect day model calculations. |
 
-Everything else is derived from age and from what the parent actually logs throughout the day.
+Everything else is derived from age and from what the parent logs.
 
-## How the Day Works
+## Core Engine
 
-### The day begins when the first feed is logged.
+`DayEngine.snapshot()` is a **pure function** — no side effects, no persistence, no UI.
 
-There is no "wake time" setting. The baby wakes when the baby wakes. The first logged feed is the signal that the day has started. The app doesn't need to know the plan — it just needs to know what happened.
+```
+DayEngine.snapshot(baby, feeds, sleeps, wakeTime, now) → DaySnapshot
+```
 
-### The day ends at bedtime.
+### Wake Reference
 
-Bedtime is the single fixed point the entire model works backward from. All nap cutoff logic, final wake window calculations, and bedtime routine signals reference this anchor.
+The engine resolves "when did baby last wake up?" using this priority chain:
 
-### Everything in between is reactive.
+```
+wakeReference = lastSleepEnd ?? wakeTime ?? firstEventTime
+```
 
-The app watches two running clocks at all times:
+- `lastSleepEnd` — most recent completed nap's end time (always wins if naps exist)
+- `wakeTime` — explicit morning wake time from `WakeEvent`
+- `firstEventTime` — earliest logged event of any kind
 
-- **Time since last feed** — drives feed readiness
-- **Time since last sleep ended** — drives wake window awareness
+If all are nil → state is `.notStarted`.
 
-From these two clocks and the baby's age, the app derives everything the home screen needs.
+### DaySnapshot Output
+
+```swift
+struct DaySnapshot {
+    let dayState: DayState          // Current sleep/wake state (10 cases)
+    let feedState: FeedState         // Current feed state (5 cases)
+    let completedNaps: Int
+    let totalFeedCount: Int
+    let napCutoff: Date              // Last possible nap end time
+    let bedtime: Date
+    let ageTable: AgeTable
+    let wakeTime: Date?
+    let wakeReference: Date?         // For live awake-duration display
+    let lastFeedReference: Date?     // For live "last fed X ago" display
+}
+```
+
+The view layer uses `wakeReference` and `lastFeedReference` with `TimelineView(.periodic(by: 60))` to live-update durations without recomputing the full snapshot.
 
 ## Age-Derived Targets
 
-The app maintains a table of age-appropriate targets. These are not rigid rules — they are reference points that inform what the home screen surfaces.
+`AgeTable.forAge(days:)` maps baby age to developmental bracket. All values in **minutes**.
 
 ### Wake Windows
 
-Wake windows are **progressive throughout the day** — shorter in the morning, longer in the evening. The app does not prescribe when naps should happen. It simply knows how long the baby has been awake and whether that duration is within, approaching, or beyond the age-appropriate window for this point in the day.
+Progressive throughout the day — indexed by completed nap count: `wakeWindows[min(completedNaps, count-1)]`. The last entry is always the bedtime wake window, also used for nap cutoff.
 
-| Age | Naps/Day | WW1 | WW2 | WW3 | WW4 | Last WW (to bed) |
-|---|---|---|---|---|---|---|
-| 0–2 mo | 4–5 | 45–60m | 45–60m | 45–60m | 45–60m | 45–60m |
-| 3–4 mo | 3–4 | 1.25–1.5h | 1.5–1.75h | 1.5–1.75h | 1.75–2h | 1.75–2h |
-| 5–7 mo | 2–3 | 1.75–2.5h | 2–2.75h | 2.25–3h | — | 2.5–3h |
-| 8–10 mo | 2 | 2.5–3h | 3–3.5h | — | — | 3–4h |
-| 11–14 mo | 1–2 | 3–4h | 3.5–4.5h | — | — | 3.5–4.5h |
-
-*These ranges will be refined. The key principle is that the app knows which wake window the baby is in (first, second, last) based on how many naps have been logged today, and uses the appropriate range — not a single flat number.*
+| Age | Days | Naps | WW1 | WW2 | WW3 | WW4 | Last WW |
+|---|---|---|---|---|---|---|---|
+| 0–2 mo | 0–59 | 4–5 | 45–60 | 45–60 | 45–60 | 45–60 | 45–60 |
+| 3–4 mo | 60–149 | 3–4 | 75–90 | 90–105 | 90–105 | 105–120 | 105–120 |
+| 5–7 mo | 150–209 | 2–3 | 105–150 | 120–165 | 135–180 | — | 150–180 |
+| 8–10 mo | 210–299 | 2 | 150–180 | 180–210 | — | — | 180–240 |
+| 11–14 mo | 300–419 | 1–2 | 180–240 | 210–270 | — | — | 210–270 |
 
 ### Feed Intervals
 
-| Age | Typical Interval | Expected Feeds/Day |
-|---|---|---|
-| 0–2 mo | 2–3h | 8–12 |
-| 3–4 mo | 2.5–3.5h | 6–8 |
-| 5–7 mo | 3–4h | 5–6 |
-| 8–12 mo | 3.5–4.5h | 4–5 |
+| Age | Days | Interval (min) | Feeds/Day |
+|---|---|---|---|
+| 0–2 mo | 0–59 | 120–180 | 8–12 |
+| 3–4 mo | 60–149 | 150–210 | 6–8 |
+| 5–7 mo | 150–209 | 180–240 | 5–6 |
+| 8–10 mo | 210–299 | 210–270 | 4–5 |
+| 11–14 mo | 300–419 | 210–270 | 4–5 |
 
-Feed intervals are measured from the *start* of the last feed. The app surfaces time since last feed and signals when the baby is approaching or within the next feed window.
+Custom feed interval (`baby.customFeedIntervalMinutes > 0`) overrides the age-based range with a fixed value.
 
 ### Nap Cutoff
 
-This is the single most important derived constraint. It answers: **"Is there still room for a nap before bedtime?"**
+Single computed timestamp:
 
 ```
-nap_cutoff = bedtime − last_wake_window_for_age
+napCutoff = bedtime − lastWakeWindow.upperBound
 ```
 
-For a 6-month-old with a 7:00 PM bedtime and a last wake window of ~2.5–3h, the nap cutoff is roughly **4:00–4:30 PM**. Any nap must end by this time, or it risks pushing bedtime.
+Example: 3–4 mo baby, bedtime 7:00 PM, last WW upper = 120 min → cutoff = 5:00 PM.
 
-The nap cutoff is not a single moment — it's a closing window. The app can signal:
-- **Nap still possible** — there's time for a nap that ends before cutoff
-- **Nap window closing** — a nap would need to be short
-- **Nap window closed** — no more naps; bridge to bedtime
+The UI clamps "nap by" suggestions: `napByTime = min(wakeReference + WW.upperBound, napCutoff)`.
 
-## Home Screen States
+## Day States
 
-The home screen reflects reality. Based on the two running clocks and the derived constraints, the baby is always in one of these states:
+`DayState` is a 10-case enum. The engine derives exactly one state from inputs.
 
-### 1. Awake — Early in Wake Window
-*She just woke up. No action needed yet.*
+| # | State | Condition | What the UI shows |
+|---|---|---|---|
+| 0 | `notStarted` | No wake reference (no events, no wake time) | "When did {name} wake up?" + time picker |
+| 1 | `awakeEarly` | Awake minutes < WW lower bound | "Awake {dur}" · "Nap by {time}" |
+| 2 | `awakeApproaching` | Awake minutes within WW range | "Awake {dur}" · "Nap by {time}" |
+| 3 | `awakeBeyond` | Awake minutes > WW upper bound | "Awake {dur}" · "Wake window ended at {time}" |
+| 4 | `sleepingNoPressure` | Active nap, cutoff > 30 min away | "Asleep {dur}" · "Started at {time}" |
+| 5 | `sleepingApproachingCutoff` | Active nap, cutoff ≤ 30 min away | "Asleep {dur}" · "Wake in {X}m for bedtime" |
+| 6 | `sleepingMustEnd` | Active nap, past cutoff | "Asleep {dur}" · "Past cutoff for bedtime" |
+| 7 | `napWindowClosed` | Awake, past cutoff, bedtime > 30 min away | "Awake {dur}" · "No more naps today" |
+| 8 | `bedtimeWindow` | Awake, bedtime ≤ 30 min away (or past) | "When did {name} fall asleep?" + time picker |
+| 9 | `asleepForNight` | Active sleep with `isNightSleep` flag | "Asleep {dur}" · "Fell asleep at {time}" |
 
-- Wake window counting up
-- Feed timer counting from last feed
-- All actions available
-- Tone: calm, informational
+**Derivation priority** (evaluated top-to-bottom, first match wins):
 
-### 2. Awake — Approaching Wake Window
-*She's been up a while. Nap is an option soon.*
+1. No wake reference → `notStarted`
+2. Active sleep + `isNightSleep` → `asleepForNight`
+3. Active sleep + past cutoff → `sleepingMustEnd`
+4. Active sleep + cutoff ≤ 30 min → `sleepingApproachingCutoff`
+5. Active sleep → `sleepingNoPressure`
+6. Bedtime ≤ 30 min away → `bedtimeWindow`
+7. Past bedtime → `bedtimeWindow(0)`
+8. Past cutoff → `napWindowClosed`
+9. Awake < WW lower → `awakeEarly`
+10. Awake ≤ WW upper → `awakeApproaching`
+11. Awake > WW upper → `awakeBeyond`
 
-- Wake window visually signals it's approaching the age-appropriate range
-- Feed status visible
-- Sleep action becomes more prominent
-- Tone: gentle awareness
+## Feed States (Parallel Track)
 
-### 3. Awake — Beyond Wake Window
-*She's been up longer than typical. She may be getting overtired.*
+`FeedState` runs independently of `DayState`. Five cases:
 
-- Wake window signals she's past the typical range
-- Sleep action is prominent
-- Tone: calm urgency, not alarm
+| State | Condition |
+|---|---|
+| `noFeedsYet` | No completed feeds today |
+| `feedingNow` | Active nursing session (no endTime) |
+| `recentlyFed` | Minutes since last feed < 80% of interval lower bound |
+| `approaching` | Minutes since last feed ≥ 80% of interval lower bound |
+| `ready` | Minutes since last feed ≥ interval lower bound |
 
-### 4. Asleep — Nap in Progress, No Time Pressure
-*She's napping. All is well.*
+Feed time is measured from the last completed feed's **startTime**.
 
-- Sleep timer counting up
-- Feed status paused or secondary
-- Nap cutoff time visible but not urgent
-- Tone: restful, quiet
-
-### 5. Asleep — Nap Approaching Cutoff
-*She's napping, but needs to wake soon to protect bedtime.*
-
-- Sleep timer shows time remaining until cutoff
-- "Wake by [time]" becomes visible
-- Tone: heads-up, not stressful
-
-### 6. Asleep — Nap Must End
-*She needs to wake up now or bedtime is at risk.*
-
-- Clear signal: wake her up
-- Tone: direct but calm
-
-### 7. Awake — Nap Window Closed
-*No more naps today. Bridge to bedtime.*
-
-- Sleep action disappears or is unavailable
-- Focus shifts to bedtime countdown and feed status
-- App may signal "bedtime routine starts in X minutes"
-- If the day has been rough, the app can suggest an earlier bedtime: "6:40 would be fine today"
-- Tone: supportive, finish-line energy
-
-### 8. Bedtime Window
-*Almost there.*
-
-- Bedtime countdown prominent
-- Feed status shows whether a final feed has happened
-- Tone: winding down
+When `asleepForNight`, the feed card shows "Dream feed at {time}" (if configured) or "Sweet dreams" instead of the standard offer.
 
 ## State Transitions
 
-States change based on logged events and elapsed time. The app never asks the parent to declare intent — it infers state from what's been logged.
+States change from logged events and elapsed time. The app never asks the parent to declare intent.
 
 | Trigger | Transition |
 |---|---|
-| First feed logged | Day begins → State 1 |
-| Wake window enters age range | State 1 → State 2 |
-| Wake window exceeds age range | State 2 → State 3 |
-| Sleep started (logged) | Any awake state → State 4 or 5 |
-| Nap approaches cutoff | State 4 → State 5 |
-| Nap reaches cutoff | State 5 → State 6 |
-| Sleep ended (logged) after cutoff | → State 7 |
-| Sleep ended (logged) before cutoff | → State 1, 2, or 3 (based on new wake window) |
-| Bedtime minus routine buffer reached | → State 8 |
-
-## Feed Logic (Runs Parallel)
-
-Feed state is independent of sleep state. It runs as a parallel track:
-
-- **Time since last feed** is always visible
-- When the interval approaches the age-appropriate range, feed action becomes more prominent
-- After a feed is logged, the timer resets
-- The app never tells a parent to feed — it shows how long it's been and lets context do the work
-
-## Bedtime Flex
-
-Bedtime is a fixed anchor, but the app allows grace. If the baby's last nap ended unusually early or the day has been difficult (e.g., short naps, long wake windows), the app can signal that an earlier bedtime is reasonable.
-
-This is not a recommendation. It's a fact: "Last nap ended at 2:30. Normal bedtime is 7:00. Putting down at 6:30–6:45 would keep the last wake window in range."
-
-## Dream Feed
-
-If enabled, the dream feed appears as a reminder after the baby is down for the night. It's a simple prompt at the configured time — "Dream feed at 10:30 PM" — and disappears once logged or dismissed. It does not affect the day model or any other calculations.
+| Wake time set or first event logged | `notStarted` → awake state (1–3 based on elapsed time) |
+| Wake minutes cross WW lower bound | `awakeEarly` → `awakeApproaching` |
+| Wake minutes cross WW upper bound | `awakeApproaching` → `awakeBeyond` |
+| Sleep started | Any awake state → sleeping state (4–6 based on cutoff proximity) |
+| Active nap cutoff ≤ 30 min | `sleepingNoPressure` → `sleepingApproachingCutoff` |
+| Active nap past cutoff | `sleepingApproachingCutoff` → `sleepingMustEnd` |
+| Nap ended, before cutoff | → awake state (1–3 based on new WW for incremented nap count) |
+| Nap ended, after cutoff | → `napWindowClosed` |
+| Bedtime ≤ 30 min away | → `bedtimeWindow` |
+| Night sleep logged (`isNightSleep` flag) | → `asleepForNight` |
 
 ## Edge Cases
 
-**No naps logged yet and wake window is long.**
-The app doesn't assume the baby should have napped. It reports the facts: "Awake for 3h 15m." The wake window signal does the work.
-
-**Very short nap.**
-The wake window resets but will re-enter the approaching range quickly. The app handles this naturally.
-
-**Missed/late logging.**
-All events can be logged retroactively with adjusted times. The model recalculates from the corrected data.
-
-**Nap transition days (e.g., 3 naps → 2).**
-The app determines which wake window applies based on how many naps have been logged today. If only one nap has happened but it's past the cutoff for a second, the model adjusts. This handles transition periods where the number of naps varies day to day.
-
-## What This Document Does Not Cover
-
-- Visual design of home screen states (separate brief)
-- Multi-caregiver logic
-- Notification strategy
-- Onboarding flow
-- Data model / persistence
+- **No naps logged, long awake time** — Engine reports facts. Wake window signal handles urgency naturally.
+- **Very short nap** — Wake window resets with incremented nap count. Next WW may be wider, so re-entry into approaching range adjusts automatically.
+- **Retroactive logging** — All events accept adjusted times. Snapshot recomputes from corrected data.
+- **Nap transitions (e.g., 3→2 naps)** — Wake window index adapts to actual nap count. If only 1 nap by cutoff, the model uses WW2 naturally.
+- **Late nap suggestion clamping** — If `wakeReference + WW.upperBound > napCutoff`, the UI displays `napCutoff` instead, preventing suggestions past the safe window.

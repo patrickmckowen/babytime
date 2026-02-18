@@ -562,6 +562,60 @@ struct CustomFeedIntervalTests {
 @Suite("DayEngine — Nap Cutoff")
 struct NapCutoffTests {
 
+    @Test("napCutoff is earlier than raw wake window nap-by time on late naps")
+    func napCutoffClampsLateNapSuggestion() {
+        // 3-4 month old, bedtime 7 PM
+        // napCutoff = 7 PM - 120 min (lastWW upper) = 5:00 PM
+        // After 3 naps, baby wakes at 4:30 PM → WW4 = 105...120 min
+        // Raw "nap by" = 4:30 PM + 120 min = 6:30 PM — 30 min before bedtime!
+        // napCutoff (5:00 PM) should clamp this.
+        let afternoonNow = Calendar.current.date(
+            from: DateComponents(year: 2026, month: 2, day: 11, hour: 16, minute: 30)
+        )!
+        let baby = makeBaby(ageDays: 90, bedtimeHour: 19, referenceDate: afternoonNow)
+
+        // 3 completed naps earlier in the day
+        let nap1 = makeSleep(startedMinutesAgo: 420, durationMinutes: 60, referenceDate: afternoonNow)
+        let nap2 = makeSleep(startedMinutesAgo: 300, durationMinutes: 45, referenceDate: afternoonNow)
+        let nap3 = makeSleep(startedMinutesAgo: 60, durationMinutes: 30, referenceDate: afternoonNow)
+        // Baby woke from nap3 at 4:00 PM, now 4:30 PM → 30 min awake
+        let feed = makeFeed(minutesAgo: 30, referenceDate: afternoonNow)
+
+        let snapshot = DayEngine.snapshot(
+            baby: baby,
+            feeds: [feed],
+            sleeps: [nap1, nap2, nap3],
+            now: afternoonNow
+        )
+
+        // Engine should return awakeEarly — 30 min awake, WW4 = 105...120
+        if case .awakeEarly(let mins, let range) = snapshot.dayState {
+            #expect(mins == 30)
+            #expect(range == 105...120) // WW4 for 3-4mo
+
+            // The raw wake-window nap-by time
+            let wakeRef = snapshot.wakeReference!
+            let rawNapBy = wakeRef.addingTimeInterval(Double(range.upperBound) * 60)
+
+            // rawNapBy (6:30 PM) is AFTER napCutoff (5:00 PM) — this is the bug scenario
+            #expect(rawNapBy > snapshot.napCutoff,
+                    "Raw nap-by should exceed napCutoff to reproduce the bug scenario")
+
+            // The clamped value (what the UI should show) respects napCutoff
+            let clampedNapBy = min(rawNapBy, snapshot.napCutoff)
+            #expect(clampedNapBy == snapshot.napCutoff,
+                    "Clamped nap-by should equal napCutoff when raw time exceeds it")
+
+            // napCutoff should be 5:00 PM (bedtime 7 PM - 120 min)
+            let expectedCutoff = Calendar.current.date(
+                from: DateComponents(year: 2026, month: 2, day: 11, hour: 17, minute: 0)
+            )!
+            #expect(snapshot.napCutoff == expectedCutoff)
+        } else {
+            Issue.record("Expected awakeEarly, got \(snapshot.dayState)")
+        }
+    }
+
     @Test("Nap cutoff = bedtime - last wake window upper bound",
           arguments: [
             (19, 105, 120), // 3-4mo: bedtime 7PM, lastWW 105...120 → cutoff 5PM

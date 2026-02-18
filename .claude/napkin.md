@@ -18,6 +18,8 @@
 | 2026-02-15 | self | Running `xcodebuild test` without `-only-testing` included BabyTimeUITests, which spawns simulator clones per UI config (runsForEachTargetApplicationUIConfiguration) and OOM'd the machine | ALWAYS use `-only-testing:BabyTimeTests`. Never run BabyTimeUITests. See CLAUDE.md Testing section and xcodebuildmcp guide.md |
 | 2026-02-17 | self | Tried to extract `matchedTransitionSource` config closure into a static func with `MatchedTransitionSourceConfiguration.Source` type | `Source` is not a member type of the protocol — opaque return types. Keep closure inline, reference design tokens within it |
 | 2026-02-17 | self+user | Shadow flash on zoom transition — `.cardShadow()` before `.matchedTransitionSource` caused shadow to disappear/reappear during animation | Apply `.cardShadow()` AFTER `.matchedTransitionSource`. Don't duplicate shadow in config closure — only `.background()` and `.clipShape()`. The config `.shadow()` renders on a different backing layer than `View.shadow()`, causing the flash. See ios-fluid-components gotchas.md |
+| 2026-02-17 | user | SleepSheetView manual logging broken — draft time bindings didn't auto-initialize companion time | When duplicating sheet patterns, verify ALL branches of binding setters are copied — the no-session else branch with auto-init is easy to miss |
+| 2026-02-17 | self | napByTimeString() computed "Nap by X" from wakeReference + currentWW.upperBound without clamping to napCutoff — suggested naps 30 min before bedtime | When DayEngine exposes a boundary (napCutoff, bedtime), the UI MUST respect it. Don't recompute from raw inputs when a pre-computed limit exists on the snapshot |
 
 ## User Preferences
 - Ask questions, don't guess or assume

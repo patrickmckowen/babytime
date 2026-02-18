@@ -41,9 +41,8 @@ struct SleepSheetView: View {
         return activityManager.hasSleepSession || (draftStartTime != nil && draftEndTime != nil)
     }
 
-    private var canReset: Bool {
-        if isEditing { return false }
-        return activityManager.hasSleepSession || draftStartTime != nil || draftEndTime != nil
+    private var showReset: Bool {
+        !isEditing && activityManager.hasSleepSession && !activityManager.isSleepActive
     }
 
     private var isPickerRecentlyActive: Bool {
@@ -74,21 +73,10 @@ struct SleepSheetView: View {
             .background(Color.btBackground)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button(role: .cancel) {
-                        if !isEditing {
-                            activityManager.resetSleep()
-                        }
+                    Button {
                         dismiss()
-                    }
-                }
-                if canReset {
-                    ToolbarItem(placement: .destructiveAction) {
-                        Button("Reset", systemImage: "arrow.counterclockwise") {
-                            activityManager.resetSleep()
-                            draftStartTime = nil
-                            draftEndTime = nil
-                        }
-                        .tint(Color.btTextSecondary)
+                    } label: {
+                        Image(systemName: "chevron.down")
                     }
                 }
                 ToolbarItem(placement: .confirmationAction) {
@@ -194,6 +182,19 @@ struct SleepSheetView: View {
 
                 Spacer()
 
+                Button {
+                    activityManager.resetSleep()
+                    draftStartTime = nil
+                    draftEndTime = nil
+                } label: {
+                    Image(systemName: "arrow.counterclockwise")
+                        .font(.system(size: 17, weight: .medium))
+                        .foregroundStyle(Color.btTextPrimary)
+                }
+                .opacity(showReset ? 1 : 0)
+                .allowsHitTesting(showReset)
+                .padding(.trailing, 16)
+
                 DatePicker(
                     "",
                     selection: startTimeBinding,
@@ -224,20 +225,7 @@ struct SleepSheetView: View {
                     displayedComponents: [.hourAndMinute]
                 )
                 .labelsHidden()
-                .disabled(!isEditing && activityManager.isSleepActive)
-                .opacity(!isEditing && activityManager.isSleepActive ? 0.0 : 1.0)
-                .overlay {
-                    if !isEditing && activityManager.isSleepActive {
-                        Text("—")
-                            .font(.subheadline.weight(.medium))
-                            .foregroundStyle(Color.btTextSecondary.opacity(0.4))
-                            .frame(maxWidth: .infinity, alignment: .trailing)
-                    }
-                }
-                .simultaneousGesture(TapGesture().onEnded {
-                    guard isEditing || !activityManager.isSleepActive else { return }
-                    pickerInteractionDate = Date()
-                })
+                .simultaneousGesture(TapGesture().onEnded { pickerInteractionDate = Date() })
             }
             .padding(.vertical, 14)
         }

@@ -69,13 +69,43 @@ struct SleepSheetView: View {
 
                 // Start / End time rows (always visible)
                 timesList
-
-                // Reset / Save buttons
-                actionButtons
-                    .padding(.top, 24)
             }
             .padding(.horizontal, BTSpacing.pageMargin)
             .background(Color.btBackground)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button(role: .cancel) {
+                        if !isEditing {
+                            activityManager.resetSleep()
+                        }
+                        dismiss()
+                    }
+                }
+                if canReset {
+                    ToolbarItem(placement: .destructiveAction) {
+                        Button("Reset", systemImage: "arrow.counterclockwise") {
+                            activityManager.resetSleep()
+                            draftStartTime = nil
+                            draftEndTime = nil
+                        }
+                        .tint(Color.btTextSecondary)
+                    }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button(role: .confirm) {
+                        if let event = editingEvent, let start = draftStartTime, let end = draftEndTime {
+                            activityManager.updateSleepEvent(event, startTime: start, endTime: end)
+                        } else if activityManager.hasSleepSession {
+                            activityManager.saveSleep()
+                        } else if let start = draftStartTime, let end = draftEndTime {
+                            activityManager.saveSleepManual(startTime: start, endTime: end)
+                        }
+                        dismiss()
+                    }
+                    .tint(Color.btSleepAccent)
+                    .disabled(!canSave)
+                }
+            }
         }
         .onAppear {
             if let event = editingEvent {
@@ -211,10 +241,6 @@ struct SleepSheetView: View {
             }
             .padding(.vertical, 14)
         }
-        .padding(.horizontal, BTSpacing.cardPaddingHorizontal)
-        .background(Color.btBackgroundSecondary)
-        .clipShape(RoundedRectangle(cornerRadius: BTRadius.card, style: .continuous))
-        .cardShadow()
         .padding(.vertical, 4)
     }
 
@@ -250,54 +276,6 @@ struct SleepSheetView: View {
         )
     }
 
-    // MARK: - Action Buttons
-
-    private var actionButtons: some View {
-        HStack(spacing: 14) {
-            Button {
-                if isEditing {
-                    dismiss()
-                } else {
-                    activityManager.resetSleep()
-                    draftStartTime = nil
-                    draftEndTime = nil
-                }
-            } label: {
-                Text(isEditing ? "Cancel" : "Reset")
-                    .font(BTTypography.label)
-                    .tracking(BTTracking.label)
-                    .foregroundStyle(Color.btTextSecondary)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 16)
-                    .background(Color.btBackgroundSecondary)
-                    .clipShape(Capsule())
-                    .cardShadow()
-            }
-            .disabled(!isEditing && !canReset)
-
-            Button {
-                if let event = editingEvent, let start = draftStartTime, let end = draftEndTime {
-                    activityManager.updateSleepEvent(event, startTime: start, endTime: end)
-                } else if activityManager.hasSleepSession {
-                    activityManager.saveSleep()
-                } else if let start = draftStartTime, let end = draftEndTime {
-                    activityManager.saveSleepManual(startTime: start, endTime: end)
-                }
-                dismiss()
-            } label: {
-                Text("Save")
-                    .font(BTTypography.label)
-                    .tracking(BTTracking.label)
-                    .foregroundStyle(.white)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 16)
-                    .background(Color.btSleepAccent)
-                    .clipShape(Capsule())
-                    .cardShadow()
-            }
-            .disabled(!canSave)
-        }
-    }
 }
 
 #Preview {

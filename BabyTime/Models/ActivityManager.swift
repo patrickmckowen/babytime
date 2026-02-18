@@ -309,6 +309,56 @@ final class ActivityManager {
         return (baby.sleepEvents ?? []).sorted { $0.startTime > $1.startTime }
     }
 
+    // MARK: - Event Queries (day-scoped)
+
+    func feedEvents(for date: Date) -> [FeedEvent] {
+        guard let baby else { return [] }
+        let calendar = Calendar.current
+        let start = calendar.startOfDay(for: date)
+        guard let end = calendar.date(byAdding: .day, value: 1, to: start) else { return [] }
+        return (baby.feedEvents ?? [])
+            .filter { $0.startTime >= start && $0.startTime < end }
+            .sorted { $0.startTime < $1.startTime }
+    }
+
+    func sleepEvents(for date: Date) -> [SleepEvent] {
+        guard let baby else { return [] }
+        let calendar = Calendar.current
+        let start = calendar.startOfDay(for: date)
+        guard let end = calendar.date(byAdding: .day, value: 1, to: start) else { return [] }
+        return (baby.sleepEvents ?? [])
+            .filter { !$0.isNightSleep && $0.startTime >= start && $0.startTime < end }
+            .sorted { $0.startTime < $1.startTime }
+    }
+
+    func wakeEvent(for date: Date) -> WakeEvent? {
+        guard let baby else { return nil }
+        let startOfDay = Calendar.current.startOfDay(for: date)
+        return (baby.wakeEvents ?? []).first { $0.date == startOfDay }
+    }
+
+    func nightSleep(for date: Date) -> SleepEvent? {
+        guard let baby else { return nil }
+        let calendar = Calendar.current
+        let start = calendar.startOfDay(for: date)
+        guard let end = calendar.date(byAdding: .day, value: 1, to: start) else { return nil }
+        return (baby.sleepEvents ?? [])
+            .first { $0.isNightSleep && $0.startTime >= start && $0.startTime < end }
+    }
+
+    func daysWithEvents() -> [Date] {
+        guard let baby else { return [] }
+        let calendar = Calendar.current
+        var days = Set<Date>()
+        for event in baby.feedEvents ?? [] {
+            days.insert(calendar.startOfDay(for: event.startTime))
+        }
+        for event in baby.sleepEvents ?? [] {
+            days.insert(calendar.startOfDay(for: event.startTime))
+        }
+        return days.sorted(by: >)
+    }
+
     // MARK: - Delete Events
 
     func deleteFeedEvent(_ event: FeedEvent) {

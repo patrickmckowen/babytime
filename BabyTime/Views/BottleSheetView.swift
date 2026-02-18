@@ -38,7 +38,7 @@ struct BottleSheetView: View {
                     .padding(.top, 24)
             }
             .padding(.horizontal, BTSpacing.pageMargin)
-            .background(Color.btBackgroundSecondary)
+            .background(Color.btBackground)
         }
         .onAppear {
             if let event = editingEvent {

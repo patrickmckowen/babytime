@@ -40,7 +40,7 @@ struct ContentView: View {
                 }
             }
             .navigationDestination(isPresented: $showLog) {
-                ActivityLogView()
+                DayPagerView()
             }
             .navigationDestination(isPresented: $showSettings) {
                 SettingsView()
@@ -49,12 +49,12 @@ struct ContentView: View {
         .sheet(isPresented: $showNursingSheet) {
             NursingSheetView()
                 .presentationDetents([.medium, .large])
-                .navigationTransition(.zoom(sourceID: "nursingSheet", in: sheetTransition))
+                .navigationTransition(.zoom(sourceID: "feedSheet", in: sheetTransition))
         }
         .sheet(isPresented: $showBottleSheet) {
             BottleSheetView()
                 .presentationDetents([.medium, .large])
-                .navigationTransition(.zoom(sourceID: "bottleSheet", in: sheetTransition))
+                .navigationTransition(.zoom(sourceID: "feedSheet", in: sheetTransition))
         }
         .sheet(isPresented: $showSleepSheet) {
             SleepSheetView()

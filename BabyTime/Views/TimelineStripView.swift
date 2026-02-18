@@ -17,32 +17,32 @@ struct TimelineStripView: View {
     private let cornerRadius: CGFloat = 6
 
     var body: some View {
-        ZStack(alignment: .top) {
+        Canvas { context, size in
+            let rect = CGRect(origin: .zero, size: size)
+            let shape = RoundedRectangle(cornerRadius: cornerRadius)
+            let path = shape.path(in: rect)
+
             // Background track
-            RoundedRectangle(cornerRadius: cornerRadius)
-                .fill(Color.btBackgroundSecondary)
+            context.fill(path, with: .color(Color.btBackgroundSecondary))
 
-            // Colored segments
-            ForEach(day.segments) { segment in
-                let y1 = yOffset(for: segment.start)
-                let y2 = yOffset(for: segment.end)
-                let height = max(0, y2 - y1)
+            // Draw colored segments clipped to the rounded rect
+            for segment in day.segments where segment.kind != .awake {
+                let y1 = yPosition(for: segment.start)
+                let y2 = yPosition(for: segment.end)
+                let segHeight = max(0, y2 - y1)
+                guard segHeight > 0 else { continue }
 
-                if segment.kind != .awake && height > 0 {
-                    color(for: segment.kind)
-                        .frame(height: height)
-                        .offset(y: y1)
-                        .frame(maxHeight: .infinity, alignment: .top)
-                }
+                let segRect = CGRect(x: 0, y: y1, width: size.width, height: segHeight)
+                let segPath = Path(segRect).intersection(path)
+                context.fill(segPath, with: .color(color(for: segment.kind)))
             }
         }
         .frame(width: barWidth, height: totalHeight)
-        .clipShape(RoundedRectangle(cornerRadius: cornerRadius))
     }
 
     // MARK: - Helpers
 
-    private func yOffset(for time: Date) -> CGFloat {
+    private func yPosition(for time: Date) -> CGFloat {
         let total = day.dayEnd.timeIntervalSince(day.dayStart)
         guard total > 0 else { return 0 }
         let elapsed = time.timeIntervalSince(day.dayStart)

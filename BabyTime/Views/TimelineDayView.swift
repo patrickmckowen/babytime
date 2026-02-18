@@ -113,10 +113,9 @@ struct TimelineDayView: View {
 // MARK: - Positioned Event
 
 private struct PositionedEvent: Identifiable {
+    let id = UUID()
     let entry: LogEntry
     var yOffset: CGFloat
-
-    var id: PersistentIdentifier { entry.id }
 }
 
 // MARK: - Preview
@@ -126,52 +125,60 @@ private struct PositionedEvent: Identifiable {
         for: Baby.self, FeedEvent.self, SleepEvent.self, WakeEvent.self,
         configurations: ModelConfiguration(isStoredInMemoryOnly: true)
     )
-    let ctx = container.mainContext
+    let manager = ActivityManager(modelContext: container.mainContext)
+    let baby = manager.addBaby(
+        name: "Kaia",
+        birthdate: Calendar.current.date(byAdding: .day, value: -100, to: Date())!
+    )
+    manager.selectBaby(baby)
+
     let cal = Calendar.current
     let today = Date()
 
-    let baby = Baby(
-        name: "Kaia",
-        birthdate: cal.date(byAdding: .day, value: -100, to: today)!
+    // Wake at 6:30 AM
+    manager.setWakeTime(cal.date(bySettingHour: 6, minute: 30, second: 0, of: today)!)
+
+    // 6:45 AM — 4oz bottle
+    manager.saveBottle(amountOz: 4, at: cal.date(bySettingHour: 6, minute: 45, second: 0, of: today)!)
+
+    // 8:00–9:15 AM — Nap 1
+    manager.saveSleepManual(
+        startTime: cal.date(bySettingHour: 8, minute: 0, second: 0, of: today)!,
+        endTime: cal.date(bySettingHour: 9, minute: 15, second: 0, of: today)!
     )
-    ctx.insert(baby)
 
-    // Build events directly — faster than going through ActivityManager
-    let wakeTime = cal.date(bySettingHour: 6, minute: 30, second: 0, of: today)!
+    // 9:30 AM — Nursed 12 min
+    manager.saveNursingManual(
+        startTime: cal.date(bySettingHour: 9, minute: 30, second: 0, of: today)!,
+        endTime: cal.date(bySettingHour: 9, minute: 42, second: 0, of: today)!
+    )
 
-    let feeds: [FeedEvent] = [
-        FeedEvent(startTime: cal.date(bySettingHour: 6, minute: 45, second: 0, of: today)!,
-                  endTime: cal.date(bySettingHour: 6, minute: 45, second: 0, of: today)!,
-                  kind: .bottle, amountOz: 4, baby: baby),
-        FeedEvent(startTime: cal.date(bySettingHour: 9, minute: 30, second: 0, of: today)!,
-                  endTime: cal.date(bySettingHour: 9, minute: 42, second: 0, of: today)!,
-                  kind: .nursing, side: .left, baby: baby),
-        FeedEvent(startTime: cal.date(bySettingHour: 13, minute: 0, second: 0, of: today)!,
-                  endTime: cal.date(bySettingHour: 13, minute: 0, second: 0, of: today)!,
-                  kind: .bottle, amountOz: 5, baby: baby),
-        FeedEvent(startTime: cal.date(bySettingHour: 15, minute: 30, second: 0, of: today)!,
-                  endTime: cal.date(bySettingHour: 15, minute: 30, second: 0, of: today)!,
-                  kind: .bottle, amountOz: 4, baby: baby),
-    ]
+    // 11:00 AM–12:30 PM — Nap 2
+    manager.saveSleepManual(
+        startTime: cal.date(bySettingHour: 11, minute: 0, second: 0, of: today)!,
+        endTime: cal.date(bySettingHour: 12, minute: 30, second: 0, of: today)!
+    )
 
-    let naps: [SleepEvent] = [
-        SleepEvent(startTime: cal.date(bySettingHour: 8, minute: 0, second: 0, of: today)!,
-                   endTime: cal.date(bySettingHour: 9, minute: 15, second: 0, of: today)!,
-                   baby: baby),
-        SleepEvent(startTime: cal.date(bySettingHour: 11, minute: 0, second: 0, of: today)!,
-                   endTime: cal.date(bySettingHour: 12, minute: 30, second: 0, of: today)!,
-                   baby: baby),
-        SleepEvent(startTime: cal.date(bySettingHour: 14, minute: 30, second: 0, of: today)!,
-                   endTime: cal.date(bySettingHour: 15, minute: 15, second: 0, of: today)!,
-                   baby: baby),
-    ]
+    // 1:00 PM — 5oz bottle
+    manager.saveBottle(amountOz: 5, at: cal.date(bySettingHour: 13, minute: 0, second: 0, of: today)!)
 
-    for f in feeds { ctx.insert(f) }
-    for n in naps { ctx.insert(n) }
+    // 2:30–3:15 PM — Nap 3
+    manager.saveSleepManual(
+        startTime: cal.date(bySettingHour: 14, minute: 30, second: 0, of: today)!,
+        endTime: cal.date(bySettingHour: 15, minute: 15, second: 0, of: today)!
+    )
+
+    // 3:30 PM — 4oz bottle
+    manager.saveBottle(amountOz: 4, at: cal.date(bySettingHour: 15, minute: 30, second: 0, of: today)!)
+
+    // Build timeline from saved data
+    let feeds = manager.feedEvents(for: today)
+    let naps = manager.sleepEvents(for: today)
+    let wake = manager.wakeEvent(for: today)
 
     let day = TimelineDay.build(
         date: today,
-        wakeTime: wakeTime,
+        wakeTime: wake?.time,
         feeds: feeds,
         naps: naps,
         nightSleep: nil,

@@ -17,7 +17,7 @@ struct BabyTimeApp: App {
     init() {
         let container: ModelContainer
         if ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil {
-            let config = ModelConfiguration(isStoredInMemoryOnly: true, cloudKitDatabase: .none)
+            let config = ModelConfiguration("test-host", isStoredInMemoryOnly: true, cloudKitDatabase: .none)
             container = try! ModelContainer(
                 for: Baby.self, FeedEvent.self, SleepEvent.self, WakeEvent.self,
                 configurations: config

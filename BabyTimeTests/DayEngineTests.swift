@@ -688,8 +688,8 @@ struct NursingOzRateTests {
         let afternoon = Calendar.current.date(
             from: DateComponents(year: 2026, month: 2, day: 15, hour: 14, minute: 0)
         )!
-        #expect(table.nursingOzPerMinute(at: morning) == 0.15)
-        #expect(table.nursingOzPerMinute(at: afternoon) == 0.15)
+        #expect(table.nursingOzPerMinute(at: morning, ageInDays: 45) == 0.15)
+        #expect(table.nursingOzPerMinute(at: afternoon, ageInDays: 45) == 0.15)
     }
 }
 

@@ -34,8 +34,9 @@ struct AgeTable: Sendable, Equatable {
 
     /// Nursing oz-per-minute estimate for this age bracket.
     /// For 60+ days: higher rate before 8am (fuller breast after overnight rest).
-    func nursingOzPerMinute(at sessionStart: Date) -> Double {
-        switch ageRangeDays.lowerBound {
+    func nursingOzPerMinute(at sessionStart: Date, ageInDays: Int? = nil) -> Double {
+        let age = ageInDays ?? ageRangeDays.lowerBound
+        switch age {
         case 0..<30: return 0.1
         case 30..<60: return 0.15
         default:

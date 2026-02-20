@@ -9,6 +9,7 @@
 import Foundation
 import SwiftUI
 import SwiftData
+import UserNotifications
 
 @Observable
 final class ActivityManager {
@@ -98,6 +99,16 @@ final class ActivityManager {
     func refresh() {
         loadTodayEvents()
         computeSnapshot()
+        scheduleNotifications()
+    }
+
+    private func scheduleNotifications() {
+        guard let snapshot, let baby else {
+            UNUserNotificationCenter.current().removeAllPendingNotificationRequests()
+            return
+        }
+        let triggers = NotificationScheduler.triggers(from: snapshot, baby: baby, now: Date())
+        NotificationManager.reschedule(triggers)
     }
 
     private func loadTodayEvents() {

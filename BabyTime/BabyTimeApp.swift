@@ -12,6 +12,7 @@ import SwiftData
 struct BabyTimeApp: App {
     let container: ModelContainer
     @State private var activityManager: ActivityManager
+    @Environment(\.scenePhase) private var scenePhase
 
     init() {
         let container: ModelContainer
@@ -34,6 +35,11 @@ struct BabyTimeApp: App {
                 .environment(activityManager)
                 .modelContainer(container)
                 .preferredColorScheme(.light)
+                .onChange(of: scenePhase) { _, newPhase in
+                    if newPhase == .active {
+                        activityManager.refresh()
+                    }
+                }
         }
     }
 }

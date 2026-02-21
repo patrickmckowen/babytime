@@ -26,6 +26,8 @@
 | 2026-02-20 | self | No shared scheme → Xcode 26.2 auto-generated scheme with parallel distributed testing, spawning 11 simulator clones | Always commit a shared scheme at `xcshareddata/xcschemes/`. Set `parallelizable="NO"` on test targets. Use `-parallel-testing-enabled NO` as belt-and-suspenders |
 | 2026-02-20 | self | `AgeTableTests` had wrong boundary: `(120, "5-7 months")` but day 120 is in `60..<150` = "3-4 months" | Always verify parameterized test data against the actual source ranges. Day 150 is the real boundary for "5-7 months" |
 | 2026-02-20 | self | In-memory ModelContainer in test host app + test containers collided | Give each container a unique name: `ModelConfiguration("test-\(UUID())")` for tests, `ModelConfiguration("test-host")` for the app's test-mode container |
+| 2026-02-20 | self | Files reverted by external process (linter/hook) during multi-file edit — SleepCard.swift overwritten, TimePickerSheet.swift deleted | After writing files, verify they exist and contain expected content before moving on. Re-read and re-apply if reverted |
+| 2026-02-20 | self | `git checkout -b` succeeded but later `git status` showed wrong branch | After creating branches, always verify with `git branch --show-current` before committing |
 
 ## User Preferences
 - Ask questions, don't guess or assume
@@ -89,5 +91,13 @@
 ### Fluid Transition: SleepCard → SleepSheetView
 - **Source ID:** `"sleepSheet"` on the **card container** (not the Sleep button)
 - **Why card-level:** Same reason as feed — Sleep button disappears in `.sleepActive` mode
-- Card container always visible across all modes (`.awake`, `.sleepActive`, `.sleeping`, `.wakeTimePrompt`, `.bedtimePrompt`)
+- Card container always visible across all modes (`.awake`, `.sleepActive`, `.sleeping`, `.wakeTimePrompt`, `.bedtime`, `.asleepForNight`)
 - Active timer tap in `.sleepActive` mode now also gets zoom transition
+
+### Overnight Sleep Flow
+- Night sleep uses `isNightSleep` flag on SleepEvent — not time-of-day heuristics
+- `activeNightSleep` queries all baby sleep events (not just today's) for cross-day tracking
+- 5 AM threshold: wake before = overnight waking (cycle back to bedtimeWindow), wake after = morning
+- 48-hour safety net replaces midnight auto-close for orphaned night sleeps
+- Nap count excludes `isNightSleep` events in both DayEngine and ActivityManager
+- TimePickerSheet is reusable: NavigationStack + toolbar cancel/save + wheel DatePicker, presented as `.medium` detent

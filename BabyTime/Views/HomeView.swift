@@ -19,6 +19,9 @@ struct HomeView: View {
     var onLogTap: (() -> Void)?
     var onSettingsTap: (() -> Void)?
 
+    @State private var showBedtimeSheet = false
+    @State private var showWakeUpSheet = false
+
     var body: some View {
         ScrollView {
             VStack(spacing: 0) {
@@ -131,54 +134,67 @@ struct HomeView: View {
 
     @ViewBuilder
     private var sleepCard: some View {
-        if activityManager.isSleepActive || activityManager.hasSleepSession {
-            SleepCard(
-                mode: .sleepActive,
-                sheetTransition: sheetTransition,
-                onTap: onSleepTap
-            )
-        } else if let snapshot = activityManager.snapshot {
-            if snapshot.dayState.isAwakeState, snapshot.wakeReference != nil {
-                // Live-update awake duration every 60 seconds
-                SwiftUI.TimelineView(.periodic(from: .now, by: 60)) { context in
+        Group {
+            if activityManager.isSleepActive || activityManager.hasSleepSession {
+                SleepCard(
+                    mode: .sleepActive,
+                    sheetTransition: sheetTransition,
+                    onTap: onSleepTap
+                )
+            } else if let snapshot = activityManager.snapshot {
+                if snapshot.dayState.isAwakeState, snapshot.wakeReference != nil {
+                    // Live-update awake duration every 60 seconds
+                    SwiftUI.TimelineView(.periodic(from: .now, by: 60)) { context in
+                        SleepCard(
+                            mode: sleepCardMode(from: snapshot, now: context.date),
+                            sheetTransition: sheetTransition,
+                            onSleepTap: onSleepTap,
+                            onWakeTimeSubmit: { time in
+                                activityManager.setWakeTime(time)
+                            }
+                        )
+                    }
+                } else if case .asleepForNight = snapshot.dayState {
+                    // Live-update nighttime sleep duration every 60 seconds
+                    SwiftUI.TimelineView(.periodic(from: .now, by: 60)) { context in
+                        SleepCard(
+                            mode: sleepCardMode(from: snapshot, now: context.date),
+                            sheetTransition: sheetTransition,
+                            onWakeUpTap: { showWakeUpSheet = true }
+                        )
+                    }
+                } else {
                     SleepCard(
-                        mode: sleepCardMode(from: snapshot, now: context.date),
+                        mode: sleepCardMode(from: snapshot),
                         sheetTransition: sheetTransition,
                         onSleepTap: onSleepTap,
                         onWakeTimeSubmit: { time in
                             activityManager.setWakeTime(time)
-                        }
-                    )
-                }
-            } else if case .asleepForNight = snapshot.dayState {
-                // Live-update nighttime sleep duration every 60 seconds
-                SwiftUI.TimelineView(.periodic(from: .now, by: 60)) { context in
-                    SleepCard(
-                        mode: sleepCardMode(from: snapshot, now: context.date),
-                        sheetTransition: sheetTransition
+                        },
+                        onBedtimeTap: { showBedtimeSheet = true }
                     )
                 }
             } else {
                 SleepCard(
-                    mode: sleepCardMode(from: snapshot),
+                    mode: .wakeTimePrompt(babyName: activityManager.babyName),
                     sheetTransition: sheetTransition,
-                    onSleepTap: onSleepTap,
                     onWakeTimeSubmit: { time in
                         activityManager.setWakeTime(time)
-                    },
-                    onBedtimeSubmit: { time in
-                        activityManager.logBedtime(time)
                     }
                 )
             }
-        } else {
-            SleepCard(
-                mode: .wakeTimePrompt(babyName: activityManager.babyName),
-                sheetTransition: sheetTransition,
-                onWakeTimeSubmit: { time in
-                    activityManager.setWakeTime(time)
-                }
-            )
+        }
+        .sheet(isPresented: $showBedtimeSheet) {
+            TimePickerSheet(title: "Went to bed") { time in
+                activityManager.logBedtime(time)
+            }
+            .presentationDetents([.medium])
+        }
+        .sheet(isPresented: $showWakeUpSheet) {
+            TimePickerSheet(title: "Woke up") { time in
+                activityManager.logWakeUp(at: time)
+            }
+            .presentationDetents([.medium])
         }
     }
 
@@ -236,16 +252,17 @@ struct HomeView: View {
             )
 
         case .bedtimeWindow:
-            return .bedtimePrompt(babyName: activityManager.babyName)
+            return .bedtime(babyName: activityManager.babyName)
 
         case .asleepForNight(let mins):
+            let nightSleep = activityManager.activeNightSleep
             let liveMins: Int = {
-                guard let now, let nightSleep = activityManager.todayNightSleep else { return mins }
+                guard let now, let nightSleep else { return mins }
                 return max(0, Int(now.timeIntervalSince(nightSleep.startTime) / 60))
             }()
-            return .sleeping(
+            return .asleepForNight(
                 duration: formatMinutes(liveMins),
-                detail: "Fell asleep at \(activityManager.todayNightSleep?.startTime.shortTime ?? "--")"
+                detail: "Fell asleep at \(nightSleep?.startTime.shortTime ?? "--")"
             )
         }
     }

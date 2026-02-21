@@ -109,8 +109,8 @@ The UI clamps "nap by" suggestions: `napByTime = min(wakeReference + WW.upperBou
 | 5 | `sleepingApproachingCutoff` | Active nap, cutoff ≤ 30 min away | "Asleep {dur}" · "Wake in {X}m for bedtime" |
 | 6 | `sleepingMustEnd` | Active nap, past cutoff | "Asleep {dur}" · "Past cutoff for bedtime" |
 | 7 | `napWindowClosed` | Awake, past cutoff, bedtime > 30 min away | "Awake {dur}" · "No more naps today" |
-| 8 | `bedtimeWindow` | Awake, bedtime ≤ 30 min away (or past) | "When did {name} fall asleep?" + time picker |
-| 9 | `asleepForNight` | Active sleep with `isNightSleep` flag | "Asleep {dur}" · "Fell asleep at {time}" |
+| 8 | `bedtimeWindow` | Awake, bedtime ≤ 30 min away (or past) | "Time for bed" · "Went to bed" button → sheet |
+| 9 | `asleepForNight` | Active sleep with `isNightSleep` flag | "Asleep {dur}" · "Fell asleep at {time}" · "Woke up" button → sheet |
 
 **Derivation priority** (evaluated top-to-bottom, first match wins):
 
@@ -158,6 +158,21 @@ States change from logged events and elapsed time. The app never asks the parent
 | Nap ended, after cutoff | → `napWindowClosed` |
 | Bedtime ≤ 30 min away | → `bedtimeWindow` |
 | Night sleep logged (`isNightSleep` flag) | → `asleepForNight` |
+| "Woke up" logged ≥ 5 AM | `asleepForNight` → night sleep closed + wake time set → awake state (1–3) |
+| "Woke up" logged < 5 AM | `asleepForNight` → night sleep closed → `bedtimeWindow` (overnight wake cycle) |
+| "Went to bed" after overnight wake | `bedtimeWindow` → new night sleep created → `asleepForNight` |
+
+### Overnight Wake Flow
+
+When the baby wakes during the night (before 5 AM), the parent taps "Woke up" on the sleep card. This closes the current night sleep but does **not** set the morning wake time. The card cycles back to `bedtimeWindow` with a "Went to bed" button. Once the baby falls back asleep, the parent taps "Went to bed" to create a new night sleep, returning to `asleepForNight`.
+
+This cycle repeats for each overnight waking:
+
+```
+asleepForNight → "Woke up" (< 5 AM) → bedtimeWindow → "Went to bed" → asleepForNight → ...
+```
+
+When the baby wakes after 5 AM, the wake time is set as the morning wake, ending the overnight cycle and transitioning to a normal daytime awake state.
 
 ## Edge Cases
 
@@ -166,3 +181,7 @@ States change from logged events and elapsed time. The app never asks the parent
 - **Retroactive logging** — All events accept adjusted times. Snapshot recomputes from corrected data.
 - **Nap transitions (e.g., 3→2 naps)** — Wake window index adapts to actual nap count. If only 1 nap by cutoff, the model uses WW2 naturally.
 - **Late nap suggestion clamping** — If `wakeReference + WW.upperBound > napCutoff`, the UI displays `napCutoff` instead, preventing suggestions past the safe window.
+- **Cross-day night sleep** — Night sleep logged at 8 PM on day N is still active on day N+1. `activeNightSleep` queries all baby sleep events (not just today's) for an active `isNightSleep` event. The snapshot includes it for correct `asleepForNight` state derivation.
+- **Orphaned night sleep** — If a night sleep is never closed (app crash, forgotten), a 48-hour safety net auto-closes it with an 8-hour assumed duration. This replaces the previous midnight auto-close which lost data.
+- **Morning wake threshold** — 5 AM hardcoded. Wakes before 5 AM are treated as overnight wakings; wakes at or after 5 AM set the morning wake time.
+- **Nap count excludes night sleep** — Only completed sleeps where `isNightSleep == false` count toward `completedNaps`. This prevents night sleep from advancing the wake window index.

@@ -35,7 +35,8 @@ enum DayEngine {
 
         let conflicts = detectConflicts(activeFeeds: activeFeeds, activeSleeps: activeSleeps)
 
-        let napCount = completedSleeps.count
+        // Only count naps (not night sleeps) for wake window indexing
+        let napCount = completedSleeps.filter { !$0.isNightSleep }.count
         let feedCount = completedFeeds.count + (activeFeed != nil ? 1 : 0)
         let currentWW = ageTable.currentWakeWindow(completedNaps: napCount)
 

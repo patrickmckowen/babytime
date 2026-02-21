@@ -164,10 +164,16 @@ final class ActivityManager {
             snapshot = nil
             return
         }
+        // Include any active cross-day night sleep so the engine sees it
+        var sleeps = todaySleeps
+        if let nightSleep = activeNightSleep,
+           !sleeps.contains(where: { $0.persistentModelID == nightSleep.persistentModelID }) {
+            sleeps.append(nightSleep)
+        }
         snapshot = DayEngine.snapshot(
             baby: baby,
             feeds: todayFeeds,
-            sleeps: todaySleeps,
+            sleeps: sleeps,
             wakeTime: todayWakeEvent?.time,
             now: Date()
         )
@@ -179,11 +185,12 @@ final class ActivityManager {
         guard let baby else { return }
 
         let sleeps = baby.sleepEvents ?? []
-        let startOfDay = Calendar.current.startOfDay(for: Date())
 
-        // Close overnight night sleeps from previous days
-        for sleep in sleeps where sleep.isNightSleep && sleep.isActive && sleep.startTime < startOfDay {
-            sleep.endTime = startOfDay
+        // Close orphaned night sleeps older than 48 hours (safety net for truly stale data).
+        // Recent night sleeps stay active until the parent explicitly taps "Woke up".
+        let staleThreshold = Date().addingTimeInterval(-48 * 60 * 60)
+        for sleep in sleeps where sleep.isNightSleep && sleep.isActive && sleep.startTime < staleThreshold {
+            sleep.endTime = sleep.startTime.addingTimeInterval(8 * 60 * 60)
         }
 
         // Auto-resolve feed conflicts: keep earliest active nursing, close later ones
@@ -484,8 +491,23 @@ final class ActivityManager {
         refresh()
     }
 
+    /// End the active night sleep. If the wake time is 5 AM or later,
+    /// also set it as the morning wake time for the day.
+    func logWakeUp(at time: Date) {
+        guard let nightSleep = activeNightSleep else { return }
+        nightSleep.endTime = time
+
+        let hour = Calendar.current.component(.hour, from: time)
+        if hour >= 5 {
+            setWakeTime(time)
+        }
+
+        save()
+        refresh()
+    }
+
     func updateBedtime(_ time: Date) {
-        guard let nightSleep = todayNightSleep else { return }
+        guard let nightSleep = activeNightSleep ?? todayNightSleep else { return }
         nightSleep.startTime = time
         save()
         refresh()
@@ -495,12 +517,20 @@ final class ActivityManager {
         todaySleeps.first { $0.isNightSleep }
     }
 
+    /// Finds any active night sleep across all days (not just today).
+    /// Handles the cross-day case where bedtime was logged yesterday but baby is still sleeping.
+    var activeNightSleep: SleepEvent? {
+        guard let baby else { return nil }
+        let allSleeps = baby.sleepEvents ?? []
+        return allSleeps.first { $0.isNightSleep && $0.isActive }
+    }
+
     var actualBedtimeFormatted: String? {
-        todayNightSleep?.startTime.shortTime
+        (activeNightSleep ?? todayNightSleep)?.startTime.shortTime
     }
 
     var isAsleepForNight: Bool {
-        todayNightSleep != nil
+        activeNightSleep != nil
     }
 
     // MARK: - Persistence
@@ -687,7 +717,7 @@ final class ActivityManager {
     }
 
     var feedCount: Int { todayFeeds.count }
-    var napCount: Int { todaySleeps.filter({ $0.endTime != nil }).count }
+    var napCount: Int { todaySleeps.filter({ $0.endTime != nil && !$0.isNightSleep }).count }
 
     var totalIntakeOz: Double {
         guard let baby else { return 0 }

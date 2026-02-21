@@ -379,6 +379,111 @@ struct DayStateTests {
     }
 }
 
+// MARK: - Cross-Day Night Sleep Tests
+
+@Suite("DayEngine — Cross-Day Night Sleep")
+struct CrossDayNightSleepTests {
+
+    let now = Calendar.current.date(
+        from: DateComponents(year: 2026, month: 2, day: 12, hour: 6, minute: 30)
+    )!
+
+    @Test("Active night sleep from yesterday → asleepForNight")
+    func crossDayActiveNightSleep() {
+        let baby = makeBaby(ageDays: 90, bedtimeHour: 19, referenceDate: now)
+        // Night sleep started yesterday at 7 PM (11.5 hours ago)
+        let nightSleep = makeActiveSleep(
+            startedMinutesAgo: 11 * 60 + 30,
+            isNightSleep: true,
+            referenceDate: now
+        )
+
+        let snapshot = DayEngine.snapshot(
+            baby: baby, feeds: [], sleeps: [nightSleep], now: now
+        )
+
+        if case .asleepForNight(let mins) = snapshot.dayState {
+            #expect(mins == 11 * 60 + 30)
+        } else {
+            Issue.record("Expected asleepForNight, got \(snapshot.dayState)")
+        }
+    }
+
+    @Test("Completed night sleep segments don't inflate nap count")
+    func nightSleepSegmentsExcludedFromNapCount() {
+        let baby = makeBaby(ageDays: 90, referenceDate: now)
+        // Two completed night sleep segments from overnight
+        let nightSleep1 = SleepEvent(
+            startTime: now.addingTimeInterval(-10 * 60 * 60),
+            endTime: now.addingTimeInterval(-5 * 60 * 60),
+            isNightSleep: true
+        )
+        let nightSleep2 = SleepEvent(
+            startTime: now.addingTimeInterval(-4.5 * 60 * 60),
+            endTime: now.addingTimeInterval(-30 * 60),
+            isNightSleep: true
+        )
+        let feed = makeFeed(minutesAgo: 20, referenceDate: now)
+
+        let snapshot = DayEngine.snapshot(
+            baby: baby, feeds: [feed], sleeps: [nightSleep1, nightSleep2], now: now
+        )
+
+        // Night sleep segments should NOT count as naps
+        #expect(snapshot.completedNaps == 0)
+    }
+
+    @Test("Night sleep ended after 5 AM sets correct wake reference")
+    func nightSleepEndSetsWakeReference() {
+        let baby = makeBaby(ageDays: 90, referenceDate: now)
+        // Night sleep ended 30 min ago (at 6:00 AM)
+        let nightSleep = SleepEvent(
+            startTime: now.addingTimeInterval(-10 * 60 * 60),
+            endTime: now.addingTimeInterval(-30 * 60),
+            isNightSleep: true
+        )
+        let feed = makeFeed(minutesAgo: 20, referenceDate: now)
+
+        let snapshot = DayEngine.snapshot(
+            baby: baby, feeds: [feed], sleeps: [nightSleep], now: now
+        )
+
+        // Wake reference should be the night sleep end time (6:00 AM)
+        #expect(snapshot.wakeReference != nil)
+        let wakeRef = snapshot.wakeReference!
+        let expectedWakeRef = now.addingTimeInterval(-30 * 60)
+        #expect(abs(wakeRef.timeIntervalSince(expectedWakeRef)) < 1)
+
+        // Should be awakeEarly (30 min, WW1 for 3-4mo = 75...90)
+        if case .awakeEarly(let mins, _) = snapshot.dayState {
+            #expect(mins == 30)
+        } else {
+            Issue.record("Expected awakeEarly, got \(snapshot.dayState)")
+        }
+    }
+
+    @Test("Mix of night sleeps and naps — only naps counted")
+    func mixedNightSleepAndNaps() {
+        let baby = makeBaby(ageDays: 90, referenceDate: now)
+        // Completed night sleep from overnight
+        let nightSleep = SleepEvent(
+            startTime: now.addingTimeInterval(-10 * 60 * 60),
+            endTime: now.addingTimeInterval(-4 * 60 * 60),
+            isNightSleep: true
+        )
+        // One completed nap
+        let nap = makeSleep(startedMinutesAgo: 120, durationMinutes: 30, referenceDate: now)
+        let feed = makeFeed(minutesAgo: 20, referenceDate: now)
+
+        let snapshot = DayEngine.snapshot(
+            baby: baby, feeds: [feed], sleeps: [nightSleep, nap], now: now
+        )
+
+        // Only the nap should count
+        #expect(snapshot.completedNaps == 1)
+    }
+}
+
 // MARK: - Feed State Tests
 
 @Suite("DayEngine — Feed State Derivation")
@@ -688,8 +793,8 @@ struct NursingOzRateTests {
         let afternoon = Calendar.current.date(
             from: DateComponents(year: 2026, month: 2, day: 15, hour: 14, minute: 0)
         )!
-        #expect(table.nursingOzPerMinute(at: morning) == 0.15)
-        #expect(table.nursingOzPerMinute(at: afternoon) == 0.15)
+        #expect(table.nursingOzPerMinute(at: morning, ageInDays: 45) == 0.15)
+        #expect(table.nursingOzPerMinute(at: afternoon, ageInDays: 45) == 0.15)
     }
 }
 

@@ -70,6 +70,16 @@ enum FeedState: Equatable, Sendable {
     case feedingNow(startedMinutesAgo: Int)
 }
 
+/// A detected conflict from multiple writers modifying the same baby's data.
+struct SyncConflict: Equatable, Sendable {
+    enum Kind: Equatable, Sendable {
+        case multipleActiveFeeds(count: Int)
+        case multipleActiveSleeps(count: Int)
+    }
+    let kind: Kind
+    let caregiverNames: [String]
+}
+
 /// Combined snapshot output from the DayEngine.
 struct DaySnapshot: Equatable, Sendable {
     let dayState: DayState
@@ -88,4 +98,7 @@ struct DaySnapshot: Equatable, Sendable {
     /// The last completed feed's startTime.
     /// Used by the view layer to live-compute "last fed X ago" via TimelineView.
     let lastFeedReference: Date?
+
+    /// Conflicts detected from multiple simultaneous writers (e.g. two active feeds).
+    let conflicts: [SyncConflict]
 }

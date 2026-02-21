@@ -20,6 +20,14 @@
 | 2026-02-17 | self+user | Shadow flash on zoom transition — `.cardShadow()` before `.matchedTransitionSource` caused shadow to disappear/reappear during animation | Apply `.cardShadow()` AFTER `.matchedTransitionSource`. Don't duplicate shadow in config closure — only `.background()` and `.clipShape()`. The config `.shadow()` renders on a different backing layer than `View.shadow()`, causing the flash. See ios-fluid-components gotchas.md |
 | 2026-02-17 | user | SleepSheetView manual logging broken — draft time bindings didn't auto-initialize companion time | When duplicating sheet patterns, verify ALL branches of binding setters are copied — the no-session else branch with auto-init is easy to miss |
 | 2026-02-17 | self | napByTimeString() computed "Nap by X" from wakeReference + currentWW.upperBound without clamping to napCutoff — suggested naps 30 min before bedtime | When DayEngine exposes a boundary (napCutoff, bedtime), the UI MUST respect it. Don't recompute from raw inputs when a pre-computed limit exists on the snapshot |
+| 2026-02-20 | self | SwiftData tests crashed with "ModelContext.reset destroyed model instance" — test's ModelContainer was deallocated when `makeManager()` returned | Use `withExtendedLifetime(container)` to keep ModelContainer alive for the full test scope. Never let a container become a temporary local that outlives its function |
+| 2026-02-20 | self | `syncActiveEvents()` cleared stopped event references during `refresh()` — `stopSleep()` → `refresh()` → sync sees event not active → sets to nil | Only scan for new active events when no event is currently tracked (`== nil`). Stopped events must be preserved until explicit save/reset |
+| 2026-02-20 | self | `nursingOzPerMinute` used `ageRangeDays.lowerBound` in switch but 0-2mo bracket has lowerBound=0, making `case 30..<60` dead code | Pass `ageInDays` explicitly when the distinction within a bracket matters. Don't rely on bracket boundaries for intra-bracket logic |
+| 2026-02-20 | self | No shared scheme → Xcode 26.2 auto-generated scheme with parallel distributed testing, spawning 11 simulator clones | Always commit a shared scheme at `xcshareddata/xcschemes/`. Set `parallelizable="NO"` on test targets. Use `-parallel-testing-enabled NO` as belt-and-suspenders |
+| 2026-02-20 | self | `AgeTableTests` had wrong boundary: `(120, "5-7 months")` but day 120 is in `60..<150` = "3-4 months" | Always verify parameterized test data against the actual source ranges. Day 150 is the real boundary for "5-7 months" |
+| 2026-02-20 | self | In-memory ModelContainer in test host app + test containers collided | Give each container a unique name: `ModelConfiguration("test-\(UUID())")` for tests, `ModelConfiguration("test-host")` for the app's test-mode container |
+| 2026-02-20 | self | Files reverted by external process (linter/hook) during multi-file edit — SleepCard.swift overwritten, TimePickerSheet.swift deleted | After writing files, verify they exist and contain expected content before moving on. Re-read and re-apply if reverted |
+| 2026-02-20 | self | `git checkout -b` succeeded but later `git status` showed wrong branch | After creating branches, always verify with `git branch --show-current` before committing |
 
 ## User Preferences
 - Ask questions, don't guess or assume
@@ -50,7 +58,10 @@
 - Edit mode on existing sheets: add optional `editingEvent` param, `isEditing` computed prop, seed `@State` drafts in `.onAppear`, branch save/reset logic on isEditing
 - LogEntry enum wrapping FeedEvent/SleepEvent works well for unified list display with PersistentIdentifier as Identifiable id
 - `.swipeActions` requires List context, not LazyVStack — use List with .plain style + .scrollContentBackground(.hidden) for custom backgrounds
-- Always use `-only-testing:BabyTimeTests` for test runs — pure unit tests, in-memory SwiftData, no simulator UI, completes in seconds
+- Always use `-only-testing:BabyTimeTests -parallel-testing-enabled NO` for test runs — pure unit tests, in-memory SwiftData, no simulator UI, completes in seconds
+- SwiftData test pattern: `withExtendedLifetime(container) { ... }` to keep ModelContainer alive for the full test scope
+- Named ModelConfigurations in tests (`"test-\(UUID())"`) prevent container collisions with the app host
+- Shared scheme committed at `xcshareddata/xcschemes/BabyTime.xcscheme` — do not delete, controls parallel testing
 
 ## Patterns That Don't Work
 - Glob can't find directories (like .xcodeproj) - it only finds files
@@ -63,14 +74,8 @@
 - Xcode 26.2 project using PBXFileSystemSynchronizedRootGroup (auto-sync with filesystem)
 - .xcodeproj relative paths: BabyTime, BabyTimeTests, BabyTimeUITests (relative to xcodeproj parent)
 - CODE_SIGN_ENTITLEMENTS = BabyTime/BabyTime.entitlements (relative to project root)
-- Implementation guide: docs/IMPLEMENTATION_GUIDE.md — read this first in new sessions
-- Phase 1+2 complete: SwiftData models + DayEngine + 46 tests passing
-- Phase 3+4 complete: Settings screen + UI wiring
-- Phase 5 complete: ActivityLogView — grouped-by-day, tap to edit, swipe to delete, calendar button in BabyPhotoHeader
+- Read BABYTIME.md for product vision and principles
 - Not using bottle source (breastMilk vs formula) in display — user preference
-- Deferred: TodaySummaryCard, LogView, TimelineView still use legacy types
-- Deferred: MockData.swift and Activity.swift legacy types not yet removed
-- Branch: `feature/custom-feed-interval`
 
 ### Fluid Transition: FeedCard → Nursing/Bottle Sheets
 - **Approach chosen:** Zoom transition (`.navigationTransition(.zoom)` + `.matchedTransitionSource`)
@@ -86,5 +91,13 @@
 ### Fluid Transition: SleepCard → SleepSheetView
 - **Source ID:** `"sleepSheet"` on the **card container** (not the Sleep button)
 - **Why card-level:** Same reason as feed — Sleep button disappears in `.sleepActive` mode
-- Card container always visible across all modes (`.awake`, `.sleepActive`, `.sleeping`, `.wakeTimePrompt`, `.bedtimePrompt`)
+- Card container always visible across all modes (`.awake`, `.sleepActive`, `.sleeping`, `.wakeTimePrompt`, `.bedtime`, `.asleepForNight`)
 - Active timer tap in `.sleepActive` mode now also gets zoom transition
+
+### Overnight Sleep Flow
+- Night sleep uses `isNightSleep` flag on SleepEvent — not time-of-day heuristics
+- `activeNightSleep` queries all baby sleep events (not just today's) for cross-day tracking
+- 5 AM threshold: wake before = overnight waking (cycle back to bedtimeWindow), wake after = morning
+- 48-hour safety net replaces midnight auto-close for orphaned night sleeps
+- Nap count excludes `isNightSleep` events in both DayEngine and ActivityManager
+- TimePickerSheet is reusable: NavigationStack + toolbar cancel/save + wheel DatePicker, presented as `.medium` detent

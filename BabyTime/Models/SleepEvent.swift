@@ -14,18 +14,26 @@ final class SleepEvent {
     var endTime: Date?
     var isNightSleep: Bool = false
 
+    // Multi-writer identity — stamped at creation, never modified after
+    var caregiverName: String = ""
+    var deviceID: String = ""
+
     var baby: Baby?
 
     init(
         startTime: Date = Date(),
         endTime: Date? = nil,
         isNightSleep: Bool = false,
-        baby: Baby? = nil
+        baby: Baby? = nil,
+        caregiverName: String = DeviceIdentity.caregiverName,
+        deviceID: String = DeviceIdentity.deviceID
     ) {
         self.startTime = startTime
         self.endTime = endTime
         self.isNightSleep = isNightSleep
         self.baby = baby
+        self.caregiverName = caregiverName
+        self.deviceID = deviceID
     }
 }
 

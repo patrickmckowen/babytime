@@ -19,6 +19,10 @@ final class FeedEvent {
     var amountOz: Double = 0
     var nursingSide: String = "both"
 
+    // Multi-writer identity — stamped at creation, never modified after
+    var caregiverName: String = ""
+    var deviceID: String = ""
+
     var baby: Baby?
 
     init(
@@ -28,7 +32,9 @@ final class FeedEvent {
         source: BottleSource = .breastMilk,
         amountOz: Double = 0,
         side: NursingSide = .both,
-        baby: Baby? = nil
+        baby: Baby? = nil,
+        caregiverName: String = DeviceIdentity.caregiverName,
+        deviceID: String = DeviceIdentity.deviceID
     ) {
         self.startTime = startTime
         self.endTime = endTime
@@ -37,6 +43,8 @@ final class FeedEvent {
         self.amountOz = amountOz
         self.nursingSide = side.rawValue
         self.baby = baby
+        self.caregiverName = caregiverName
+        self.deviceID = deviceID
     }
 }
 

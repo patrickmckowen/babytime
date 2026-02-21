@@ -9,6 +9,7 @@
 import Foundation
 import SwiftUI
 import SwiftData
+import UserNotifications
 
 @Observable
 final class ActivityManager {
@@ -28,10 +29,12 @@ final class ActivityManager {
 
     // MARK: - Active Event References
 
-    /// Active nursing event (persisted in SwiftData, endTime == nil)
+    /// Active nursing event. Updated from data on every refresh() cycle,
+    /// so external writes (from another device via CloudKit) are discovered
+    /// automatically when the app returns to foreground.
     private(set) var activeNursingEvent: FeedEvent?
 
-    /// Active sleep event (persisted in SwiftData, endTime == nil)
+    /// Active sleep event (nap only, not nighttime sleep).
     private(set) var activeSleepEvent: SleepEvent?
 
     // MARK: - Init
@@ -45,7 +48,6 @@ final class ActivityManager {
 
     func selectBaby(_ baby: Baby) {
         self.baby = baby
-        recoverActiveEvents()
         refresh()
     }
 
@@ -83,7 +85,6 @@ final class ActivityManager {
         loadBabies()
         if wasSelected {
             self.baby = allBabies.first
-            recoverActiveEvents()
             refresh()
         }
     }
@@ -96,8 +97,42 @@ final class ActivityManager {
     }
 
     func refresh() {
+        autoCloseStaleEvents()
+        syncActiveEvents()
         loadTodayEvents()
         computeSnapshot()
+        scheduleNotifications()
+    }
+
+    /// Discover active events from the full relationship, including events
+    /// created by other devices via CloudKit sync. Called every refresh cycle.
+    /// Only scans when no event is currently tracked — stopped events are
+    /// preserved until the user explicitly saves or resets them.
+    private func syncActiveEvents() {
+        guard let baby else {
+            activeNursingEvent = nil
+            activeSleepEvent = nil
+            return
+        }
+
+        if activeNursingEvent == nil {
+            let feeds = baby.feedEvents ?? []
+            activeNursingEvent = feeds.first { $0.kind == .nursing && $0.isActive }
+        }
+
+        if activeSleepEvent == nil {
+            let sleeps = baby.sleepEvents ?? []
+            activeSleepEvent = sleeps.first { $0.isActive && !$0.isNightSleep }
+        }
+    }
+
+    private func scheduleNotifications() {
+        guard let snapshot, let baby else {
+            UNUserNotificationCenter.current().removeAllPendingNotificationRequests()
+            return
+        }
+        let triggers = NotificationScheduler.triggers(from: snapshot, baby: baby, now: Date())
+        NotificationManager.reschedule(triggers)
     }
 
     private func loadTodayEvents() {
@@ -129,38 +164,54 @@ final class ActivityManager {
             snapshot = nil
             return
         }
+        // Include any active cross-day night sleep so the engine sees it
+        var sleeps = todaySleeps
+        if let nightSleep = activeNightSleep,
+           !sleeps.contains(where: { $0.persistentModelID == nightSleep.persistentModelID }) {
+            sleeps.append(nightSleep)
+        }
         snapshot = DayEngine.snapshot(
             baby: baby,
             feeds: todayFeeds,
-            sleeps: todaySleeps,
+            sleeps: sleeps,
             wakeTime: todayWakeEvent?.time,
             now: Date()
         )
     }
 
-    /// Recover in-progress events after app launch or baby switch.
-    /// Auto-closes stale nighttime sleeps from previous days and only
-    /// recovers nap timers (not nighttime sleep) as the active session.
-    private func recoverActiveEvents() {
-        guard let baby else {
-            activeNursingEvent = nil
-            activeSleepEvent = nil
-            return
-        }
-
-        let feeds = baby.feedEvents ?? []
-        activeNursingEvent = feeds.first { $0.kind == .nursing && $0.isActive }
+    /// Auto-close stale events and resolve multi-writer conflicts.
+    /// Called on baby selection and refresh to clean up data from any source.
+    private func autoCloseStaleEvents() {
+        guard let baby else { return }
 
         let sleeps = baby.sleepEvents ?? []
 
-        // Auto-close nighttime sleeps from previous days
-        let startOfDay = Calendar.current.startOfDay(for: Date())
-        for sleep in sleeps where sleep.isNightSleep && sleep.isActive && sleep.startTime < startOfDay {
-            sleep.endTime = startOfDay
+        // Close orphaned night sleeps older than 48 hours (safety net for truly stale data).
+        // Recent night sleeps stay active until the parent explicitly taps "Woke up".
+        let staleThreshold = Date().addingTimeInterval(-48 * 60 * 60)
+        for sleep in sleeps where sleep.isNightSleep && sleep.isActive && sleep.startTime < staleThreshold {
+            sleep.endTime = sleep.startTime.addingTimeInterval(8 * 60 * 60)
         }
 
-        // Only recover nap timers, not nighttime sleep
-        activeSleepEvent = sleeps.first { $0.isActive && !$0.isNightSleep }
+        // Auto-resolve feed conflicts: keep earliest active nursing, close later ones
+        let activeNursings = (baby.feedEvents ?? [])
+            .filter { $0.kind == .nursing && $0.isActive }
+            .sorted { $0.startTime < $1.startTime }
+        for event in activeNursings.dropFirst() {
+            event.endTime = event.startTime
+        }
+
+        // Auto-resolve sleep conflicts: keep earliest active nap, close later ones
+        let activeNaps = sleeps
+            .filter { $0.isActive && !$0.isNightSleep }
+            .sorted { $0.startTime < $1.startTime }
+        for event in activeNaps.dropFirst() {
+            event.endTime = event.startTime
+        }
+
+        if !activeNursings.dropFirst().isEmpty || !activeNaps.dropFirst().isEmpty {
+            save()
+        }
     }
 
     // MARK: - Nursing Actions
@@ -207,7 +258,7 @@ final class ActivityManager {
         if event.isActive {
             event.endTime = Date()
         }
-        save()                  // always persist, even if already stopped
+        save()
         activeNursingEvent = nil
         refresh()
     }
@@ -283,7 +334,7 @@ final class ActivityManager {
         if event.isActive {
             event.endTime = Date()
         }
-        save()                  // always persist, even if already stopped
+        save()
         activeSleepEvent = nil
         refresh()
     }
@@ -440,8 +491,23 @@ final class ActivityManager {
         refresh()
     }
 
+    /// End the active night sleep. If the wake time is 5 AM or later,
+    /// also set it as the morning wake time for the day.
+    func logWakeUp(at time: Date) {
+        guard let nightSleep = activeNightSleep else { return }
+        nightSleep.endTime = time
+
+        let hour = Calendar.current.component(.hour, from: time)
+        if hour >= 5 {
+            setWakeTime(time)
+        }
+
+        save()
+        refresh()
+    }
+
     func updateBedtime(_ time: Date) {
-        guard let nightSleep = todayNightSleep else { return }
+        guard let nightSleep = activeNightSleep ?? todayNightSleep else { return }
         nightSleep.startTime = time
         save()
         refresh()
@@ -451,12 +517,20 @@ final class ActivityManager {
         todaySleeps.first { $0.isNightSleep }
     }
 
+    /// Finds any active night sleep across all days (not just today).
+    /// Handles the cross-day case where bedtime was logged yesterday but baby is still sleeping.
+    var activeNightSleep: SleepEvent? {
+        guard let baby else { return nil }
+        let allSleeps = baby.sleepEvents ?? []
+        return allSleeps.first { $0.isNightSleep && $0.isActive }
+    }
+
     var actualBedtimeFormatted: String? {
-        todayNightSleep?.startTime.shortTime
+        (activeNightSleep ?? todayNightSleep)?.startTime.shortTime
     }
 
     var isAsleepForNight: Bool {
-        todayNightSleep != nil
+        activeNightSleep != nil
     }
 
     // MARK: - Persistence
@@ -643,12 +717,12 @@ final class ActivityManager {
     }
 
     var feedCount: Int { todayFeeds.count }
-    var napCount: Int { todaySleeps.filter({ $0.endTime != nil }).count }
+    var napCount: Int { todaySleeps.filter({ $0.endTime != nil && !$0.isNightSleep }).count }
 
     var totalIntakeOz: Double {
         guard let baby else { return 0 }
         let table = AgeTable.forAge(days: baby.ageInDays)
-        return todayFeeds.reduce(0) { $0 + $1.estimatedOz(nursingOzPerMinute: table.nursingOzPerMinute(at: $1.startTime)) }
+        return todayFeeds.reduce(0) { $0 + $1.estimatedOz(nursingOzPerMinute: table.nursingOzPerMinute(at: $1.startTime, ageInDays: baby.ageInDays)) }
     }
 
     var totalSleepMinutes: Int {

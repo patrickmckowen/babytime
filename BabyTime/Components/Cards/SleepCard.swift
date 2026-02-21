@@ -2,7 +2,7 @@
 //  SleepCard.swift
 //  BabyTime
 //
-//  Sleep status card driven by DayState: awake, sleeping, bridging, bedtime.
+//  Sleep status card driven by DayState: awake, sleeping, bedtime, asleep for night.
 //
 
 import SwiftUI
@@ -13,7 +13,8 @@ struct SleepCard: View {
     var onTap: (() -> Void)?
     var onSleepTap: (() -> Void)?
     var onWakeTimeSubmit: ((Date) -> Void)?
-    var onBedtimeSubmit: ((Date) -> Void)?
+    var onBedtimeTap: (() -> Void)?
+    var onWakeUpTap: (() -> Void)?
 
     enum Mode {
         /// Awake states — duration and detail line
@@ -24,12 +25,13 @@ struct SleepCard: View {
         case sleepActive
         /// Empty state — prompt user for wake time
         case wakeTimePrompt(babyName: String)
-        /// Bedtime window — prompt user to log when baby fell asleep
-        case bedtimePrompt(babyName: String)
+        /// Bedtime window — show "Went to bed" button
+        case bedtime(babyName: String)
+        /// Asleep for the night — live timer + "Woke up" button
+        case asleepForNight(duration: String, detail: String)
     }
 
     @State private var selectedWakeTime = Date()
-    @State private var selectedBedtime = Date()
 
     var body: some View {
         Group {
@@ -42,8 +44,10 @@ struct SleepCard: View {
                 sleepActiveContent
             case .wakeTimePrompt(let babyName):
                 wakeTimePromptContent(babyName: babyName)
-            case .bedtimePrompt(let babyName):
-                bedtimePromptContent(babyName: babyName)
+            case .bedtime(let babyName):
+                bedtimeContent(babyName: babyName)
+            case .asleepForNight(let duration, let detail):
+                asleepForNightContent(duration: duration, detail: detail)
             }
         }
         .padding(.top, BTSpacing.cardPaddingTop)
@@ -163,35 +167,78 @@ struct SleepCard: View {
         }
     }
 
-    // MARK: - Bedtime Prompt Content
+    // MARK: - Bedtime Content (button to open sheet)
 
-    private func bedtimePromptContent(babyName: String) -> some View {
+    private func bedtimeContent(babyName: String) -> some View {
         VStack(alignment: .leading, spacing: 0) {
-            Text("When did \(babyName) fall asleep?")
-                .font(BTTypography.headlineSmall)
-                .tracking(BTTracking.headlineSmall)
+            Text("Time for bed")
+                .font(BTTypography.headline)
+                .tracking(BTTracking.headline)
                 .foregroundStyle(Color.btTextPrimary)
 
-            HStack {
-                DatePicker(
-                    "",
-                    selection: $selectedBedtime,
-                    displayedComponents: .hourAndMinute
-                )
-                .labelsHidden()
+            Text("Tap when \(babyName) falls asleep")
+                .font(BTTypography.label)
+                .tracking(BTTracking.label)
+                .foregroundStyle(Color.btTextSecondary)
+                .padding(.top, BTSpacing.headlineToDetail)
 
-                Spacer()
-
-                Button {
-                    onBedtimeSubmit?(selectedBedtime)
-                } label: {
-                    Image(systemName: "checkmark")
-                        .font(.system(size: 16, weight: .semibold))
-                        .foregroundStyle(.white)
-                        .frame(width: 44, height: 44)
-                        .background(Color.btSleepAccent)
-                        .clipShape(Circle())
+            Button {
+                onBedtimeTap?()
+            } label: {
+                HStack(spacing: 6) {
+                    BTIcon(kind: .sleep)
+                        .frame(width: 16, height: 16)
+                    Text("Went to bed")
+                        .font(BTTypography.label)
+                        .tracking(BTTracking.label)
                 }
+                .foregroundStyle(Color.btTextPrimary)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 12)
+                .background(Color.btBackgroundSecondary)
+                .clipShape(Capsule())
+            }
+            .padding(.top, 18)
+        }
+    }
+
+    // MARK: - Asleep For Night Content (timer + "Woke up" button)
+
+    private func asleepForNightContent(
+        duration: String,
+        detail: String
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            (Text("Asleep ")
+                .foregroundStyle(Color.btSleepAccent)
+            + Text(duration)
+                .foregroundStyle(Color.btTextPrimary))
+                .font(BTTypography.headline)
+                .tracking(BTTracking.headline)
+
+            if !detail.isEmpty {
+                Text(detail)
+                    .font(BTTypography.label)
+                    .tracking(BTTracking.label)
+                    .foregroundStyle(Color.btTextSecondary)
+                    .padding(.top, BTSpacing.headlineToDetail)
+            }
+
+            Button {
+                onWakeUpTap?()
+            } label: {
+                HStack(spacing: 6) {
+                    Image(systemName: "sun.horizon")
+                        .font(.system(size: 14, weight: .medium))
+                    Text("Woke up")
+                        .font(BTTypography.label)
+                        .tracking(BTTracking.label)
+                }
+                .foregroundStyle(Color.btTextPrimary)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 12)
+                .background(Color.btBackgroundSecondary)
+                .clipShape(Capsule())
             }
             .padding(.top, 18)
         }
@@ -269,14 +316,30 @@ struct SleepCard: View {
     }
 }
 
-#Preview("Bedtime Prompt") {
+#Preview("Bedtime") {
     @Previewable @Namespace var ns
     ZStack {
         Color.btBackground.ignoresSafeArea()
         SleepCard(
-            mode: .bedtimePrompt(babyName: "Kaia"),
+            mode: .bedtime(babyName: "Kaia"),
             sheetTransition: ns,
-            onBedtimeSubmit: { _ in }
+            onBedtimeTap: {}
+        )
+        .padding(.horizontal, BTSpacing.pageMargin)
+    }
+}
+
+#Preview("Asleep for Night") {
+    @Previewable @Namespace var ns
+    ZStack {
+        Color.btBackground.ignoresSafeArea()
+        SleepCard(
+            mode: .asleepForNight(
+                duration: "2h 15m",
+                detail: "Fell asleep at 7:30 PM"
+            ),
+            sheetTransition: ns,
+            onWakeUpTap: {}
         )
         .padding(.horizontal, BTSpacing.pageMargin)
     }

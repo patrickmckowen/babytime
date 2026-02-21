@@ -98,6 +98,12 @@ struct ContentView: View {
             activityManager.selectBaby(first)
             selectedBabyID = first.stableID
         }
+
+        if activityManager.baby != nil {
+            Task {
+                await NotificationManager.requestPermission()
+            }
+        }
     }
 }
 

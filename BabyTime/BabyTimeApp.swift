@@ -12,11 +12,12 @@ import SwiftData
 struct BabyTimeApp: App {
     let container: ModelContainer
     @State private var activityManager: ActivityManager
+    @Environment(\.scenePhase) private var scenePhase
 
     init() {
         let container: ModelContainer
         if ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil {
-            let config = ModelConfiguration(isStoredInMemoryOnly: true, cloudKitDatabase: .none)
+            let config = ModelConfiguration("test-host", isStoredInMemoryOnly: true, cloudKitDatabase: .none)
             container = try! ModelContainer(
                 for: Baby.self, FeedEvent.self, SleepEvent.self, WakeEvent.self,
                 configurations: config
@@ -34,6 +35,11 @@ struct BabyTimeApp: App {
                 .environment(activityManager)
                 .modelContainer(container)
                 .preferredColorScheme(.light)
+                .onChange(of: scenePhase) { _, newPhase in
+                    if newPhase == .active {
+                        activityManager.refresh()
+                    }
+                }
         }
     }
 }

@@ -27,11 +27,16 @@ enum DayEngine {
         let napCutoff = napCutoffTime(bedtime: bedtime, lastWakeWindow: ageTable.lastWakeWindow)
 
         let completedSleeps = sleeps.filter { $0.endTime != nil }
-        let activeSleep = sleeps.first { $0.endTime == nil }
+        let activeFeeds = feeds.filter { $0.endTime == nil && $0.kind == .nursing }
+        let activeSleeps = sleeps.filter { $0.endTime == nil }
+        let activeSleep = activeSleeps.first
+        let activeFeed = activeFeeds.first
         let completedFeeds = feeds.filter { $0.endTime != nil || $0.kind == .bottle }
-        let activeFeed = feeds.first { $0.endTime == nil && $0.kind == .nursing }
 
-        let napCount = completedSleeps.count
+        let conflicts = detectConflicts(activeFeeds: activeFeeds, activeSleeps: activeSleeps)
+
+        // Only count naps (not night sleeps) for wake window indexing
+        let napCount = completedSleeps.filter { !$0.isNightSleep }.count
         let feedCount = completedFeeds.count + (activeFeed != nil ? 1 : 0)
         let currentWW = ageTable.currentWakeWindow(completedNaps: napCount)
 
@@ -75,7 +80,8 @@ enum DayEngine {
             ageTable: ageTable,
             wakeTime: wakeTime,
             wakeReference: wakeReference,
-            lastFeedReference: latestCompletedFeed(feeds)?.endTime ?? latestCompletedFeed(feeds)?.startTime
+            lastFeedReference: latestCompletedFeed(feeds)?.endTime ?? latestCompletedFeed(feeds)?.startTime,
+            conflicts: conflicts
         )
     }
 
@@ -205,6 +211,28 @@ enum DayEngine {
         } else {
             return .recentlyFed(minutesAgo: minutesAgo)
         }
+    }
+
+    // MARK: - Conflict Detection
+
+    private static func detectConflicts(
+        activeFeeds: [FeedEvent],
+        activeSleeps: [SleepEvent]
+    ) -> [SyncConflict] {
+        var conflicts: [SyncConflict] = []
+        if activeFeeds.count > 1 {
+            conflicts.append(SyncConflict(
+                kind: .multipleActiveFeeds(count: activeFeeds.count),
+                caregiverNames: activeFeeds.map(\.caregiverName)
+            ))
+        }
+        if activeSleeps.count > 1 {
+            conflicts.append(SyncConflict(
+                kind: .multipleActiveSleeps(count: activeSleeps.count),
+                caregiverNames: activeSleeps.map(\.caregiverName)
+            ))
+        }
+        return conflicts
     }
 
     // MARK: - Helpers

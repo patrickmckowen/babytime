@@ -6,6 +6,30 @@
 //
 
 import Foundation
+import SwiftData
+
+// MARK: - Log Entry
+
+enum LogEntry: Identifiable {
+    case feed(FeedEvent)
+    case sleep(SleepEvent)
+
+    var id: PersistentIdentifier {
+        switch self {
+        case .feed(let e): return e.persistentModelID
+        case .sleep(let e): return e.persistentModelID
+        }
+    }
+
+    var startTime: Date {
+        switch self {
+        case .feed(let e): return e.startTime
+        case .sleep(let e): return e.startTime
+        }
+    }
+}
+
+// MARK: - Timeline Day
 
 struct TimelineDay {
     let date: Date

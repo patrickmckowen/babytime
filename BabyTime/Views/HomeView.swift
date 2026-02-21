@@ -141,6 +141,12 @@ struct HomeView: View {
                     sheetTransition: sheetTransition,
                     onTap: onSleepTap
                 )
+            } else if activityManager.isOvernightWake {
+                SleepCard(
+                    mode: .bedtime(babyName: activityManager.babyName),
+                    sheetTransition: sheetTransition,
+                    onBedtimeTap: { showBedtimeSheet = true }
+                )
             } else if let snapshot = activityManager.snapshot {
                 if snapshot.dayState.isAwakeState, snapshot.wakeReference != nil {
                     // Live-update awake duration every 60 seconds

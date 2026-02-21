@@ -278,6 +278,32 @@ struct OvernightSleepFlowTests {
         }
     }
 
+    @Test("Cross-day overnight wake: snapshot includes completed night sleep from yesterday")
+    func crossDayOvernightWakeSnapshot() {
+        withManager { manager in
+            // Bedtime yesterday at 7 PM
+            let startOfDay = Calendar.current.startOfDay(for: Date())
+            let bedtime = startOfDay.addingTimeInterval(-5 * 3600) // yesterday 7 PM
+            manager.logBedtime(bedtime)
+
+            // Wake at 3 AM today (before 5 AM)
+            var comps = Calendar.current.dateComponents([.year, .month, .day], from: Date())
+            comps.hour = 3; comps.minute = 0
+            let earlyWake = Calendar.current.date(from: comps)!
+            manager.logWakeUp(at: earlyWake)
+
+            // Night sleep started yesterday → NOT in todaySleeps
+            // But lastCompletedNightSleepEndedToday finds it (endTime = 3 AM today)
+            #expect(manager.hasWakeTime == false)
+            #expect(manager.snapshot != nil)
+            #expect(manager.snapshot?.wakeReference != nil, "Should have wake reference from cross-day completed night sleep")
+
+            if case .notStarted = manager.snapshot?.dayState {
+                Issue.record("Snapshot should not be notStarted after cross-day overnight wake")
+            }
+        }
+    }
+
     @Test("napCount excludes night sleep segments")
     func napCountExcludesNightSleep() {
         withManager { manager in

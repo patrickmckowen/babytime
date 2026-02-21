@@ -28,6 +28,7 @@
 | 2026-02-20 | self | In-memory ModelContainer in test host app + test containers collided | Give each container a unique name: `ModelConfiguration("test-\(UUID())")` for tests, `ModelConfiguration("test-host")` for the app's test-mode container |
 | 2026-02-20 | self | Files reverted by external process (linter/hook) during multi-file edit — SleepCard.swift overwritten, TimePickerSheet.swift deleted | After writing files, verify they exist and contain expected content before moving on. Re-read and re-apply if reverted |
 | 2026-02-20 | self | `git checkout -b` succeeded but later `git status` showed wrong branch | After creating branches, always verify with `git branch --show-current` before committing |
+| 2026-02-21 | self | After overnight wake (logWakeUp before 5 AM), snapshot fell to `notStarted` because cross-day night sleep wasn't in todaySleeps and was no longer active | Completed cross-day night sleeps (endTime >= startOfDay) must also be included in snapshot — not just active ones. Check for "ghost" data that falls outside today-scoped queries |
 
 ## User Preferences
 - Ask questions, don't guess or assume

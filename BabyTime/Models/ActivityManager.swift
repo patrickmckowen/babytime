@@ -164,11 +164,17 @@ final class ActivityManager {
             snapshot = nil
             return
         }
-        // Include any active cross-day night sleep so the engine sees it
+        // Include cross-day night sleeps so the engine sees them:
+        // - Active night sleep (baby still sleeping from yesterday)
+        // - Completed night sleep that ended today (wake reference after overnight wakes)
         var sleeps = todaySleeps
         if let nightSleep = activeNightSleep,
            !sleeps.contains(where: { $0.persistentModelID == nightSleep.persistentModelID }) {
             sleeps.append(nightSleep)
+        }
+        if let completedNight = lastCompletedNightSleepEndedToday,
+           !sleeps.contains(where: { $0.persistentModelID == completedNight.persistentModelID }) {
+            sleeps.append(completedNight)
         }
         snapshot = DayEngine.snapshot(
             baby: baby,
@@ -523,6 +529,26 @@ final class ActivityManager {
         guard let baby else { return nil }
         let allSleeps = baby.sleepEvents ?? []
         return allSleeps.first { $0.isNightSleep && $0.isActive }
+    }
+
+    /// Most recently completed night sleep that ended today.
+    /// Provides wake reference after overnight wakes (before 5 AM).
+    private var lastCompletedNightSleepEndedToday: SleepEvent? {
+        guard let baby else { return nil }
+        let startOfDay = Calendar.current.startOfDay(for: Date())
+        let allSleeps = baby.sleepEvents ?? []
+        return allSleeps
+            .filter { $0.isNightSleep && !$0.isActive && ($0.endTime ?? .distantPast) >= startOfDay }
+            .max(by: { ($0.endTime ?? .distantPast) < ($1.endTime ?? .distantPast) })
+    }
+
+    /// True when baby woke from night sleep before 5 AM and hasn't gone back to bed.
+    var isOvernightWake: Bool {
+        guard activeNightSleep == nil else { return false }
+        guard !hasWakeTime else { return false }
+        guard lastCompletedNightSleepEndedToday != nil else { return false }
+        let hour = Calendar.current.component(.hour, from: Date())
+        return hour < 5
     }
 
     var actualBedtimeFormatted: String? {

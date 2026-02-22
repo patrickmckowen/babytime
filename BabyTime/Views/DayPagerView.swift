@@ -2,7 +2,7 @@
 //  DayPagerView.swift
 //  BabyTime
 //
-//  Swipeable horizontal pager wrapping TimelineDayView for each day.
+//  Swipeable day pager: horizontal rhythm bar at top, activity list below.
 //  Edit sheets and delete confirmation attached here.
 //
 
@@ -36,12 +36,15 @@ struct DayPagerView: View {
         }
         .sheet(item: $editingBottleEvent) { event in
             BottleSheetView(editingEvent: event)
+                .presentationDetents([.medium])
         }
         .sheet(item: $editingNursingEvent) { event in
             NursingSheetView(editingEvent: event)
+                .presentationDetents([.medium])
         }
         .sheet(item: $editingSleepEvent) { event in
             SleepSheetView(editingEvent: event)
+                .presentationDetents([.medium])
         }
     }
 
@@ -50,15 +53,61 @@ struct DayPagerView: View {
     @ViewBuilder
     private func dayPage(for date: Date) -> some View {
         let timeline = buildTimeline(for: date)
-        TimelineDayView(
-            day: timeline,
-            babyName: activityManager.babyName,
-            onTapEvent: { tapEvent($0) },
-            onDeleteEvent: { entry in
-                entryToDelete = entry
-                showDeleteConfirmation = true
+
+        VStack(spacing: 0) {
+            // Rhythm bar — fixed at top
+            DayRhythmBar(day: timeline)
+                .padding(.horizontal, BTSpacing.pageMargin)
+                .padding(.top, 12)
+                .padding(.bottom, 8)
+
+            // Event list
+            if timeline.events.isEmpty {
+                emptyState
+            } else {
+                eventList(timeline.events)
             }
-        )
+        }
+    }
+
+    // MARK: - Event List
+
+    private func eventList(_ events: [LogEntry]) -> some View {
+        List {
+            ForEach(events.sorted(by: { $0.startTime > $1.startTime })) { entry in
+                LogRow(entry: entry, babyName: activityManager.babyName)
+                    .listRowBackground(Color.btBackground)
+                    .listRowInsets(EdgeInsets())
+                    .contentShape(Rectangle())
+                    .onTapGesture { tapEvent(entry) }
+                    .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                        Button(role: .destructive) {
+                            entryToDelete = entry
+                            showDeleteConfirmation = true
+                        } label: {
+                            Label("Delete", systemImage: "trash")
+                        }
+                    }
+            }
+        }
+        .listStyle(.plain)
+        .scrollContentBackground(.hidden)
+    }
+
+    // MARK: - Empty State
+
+    private var emptyState: some View {
+        VStack(spacing: 12) {
+            Spacer()
+            Text("No activities yet")
+                .font(BTTypography.label)
+                .foregroundStyle(Color.btTextSecondary)
+            Text("Feed and sleep events will appear here")
+                .font(BTTypography.caption)
+                .foregroundStyle(Color.btTextMuted)
+            Spacer()
+        }
+        .frame(maxWidth: .infinity)
     }
 
     // MARK: - Data
@@ -149,6 +198,87 @@ struct DayPagerView: View {
             activityManager.deleteSleepEvent(event)
         }
         entryToDelete = nil
+    }
+}
+
+// MARK: - Log Row
+
+private struct LogRow: View {
+    let entry: LogEntry
+    let babyName: String
+
+    var body: some View {
+        HStack(spacing: 14) {
+            BTIcon(kind: iconKind)
+                .foregroundStyle(iconColor)
+                .frame(width: 16, height: 16)
+                .frame(width: 28)
+
+            VStack(alignment: .leading, spacing: 3) {
+                Text(title)
+                    .font(BTTypography.label)
+                    .tracking(BTTracking.label)
+                    .foregroundStyle(Color.btTextPrimary)
+
+                Text(subtitle)
+                    .font(BTTypography.caption)
+                    .foregroundStyle(Color.btTextSecondary)
+            }
+
+            Spacer()
+
+            Image(systemName: "chevron.right")
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(Color.btTextMuted)
+        }
+        .padding(.horizontal, BTSpacing.pageMargin)
+        .padding(.vertical, 14)
+    }
+
+    private var iconKind: BTIcon.Kind {
+        switch entry {
+        case .feed(let e):
+            return e.kind == .nursing ? .nursing : .bottle
+        case .sleep:
+            return .sleep
+        }
+    }
+
+    private var iconColor: Color {
+        switch entry {
+        case .feed: return Color.btFeedAccent
+        case .sleep: return Color.btSleepAccent
+        }
+    }
+
+    private var title: String {
+        switch entry {
+        case .feed(let e):
+            if e.kind == .nursing {
+                let mins = e.durationMinutes ?? 0
+                return "\(babyName) was breastfed for \(mins)m"
+            } else {
+                let oz = Int(e.amountOz)
+                return "\(babyName) had a \(oz)oz bottle"
+            }
+        case .sleep(let e):
+            return "\(babyName) slept for \(e.durationDescription)"
+        }
+    }
+
+    private var subtitle: String {
+        switch entry {
+        case .feed(let e):
+            if e.kind == .nursing {
+                let end = e.endTime?.shortTime ?? "--"
+                return "\(e.startTime.shortTime) \u{2013} \(end)"
+            } else {
+                return e.startTime.shortTime
+            }
+        case .sleep(let e):
+            let end = e.endTime?.shortTime ?? "--"
+            return "\(e.startTime.shortTime) \u{2013} \(end)"
+        }
     }
 }
 

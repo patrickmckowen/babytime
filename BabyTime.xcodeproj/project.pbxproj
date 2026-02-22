@@ -6,6 +6,10 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		87924F002F4A3921002C18EC /* SQLiteData in Frameworks */ = {isa = PBXBuildFile; productRef = 87DEAD000200000000000001 /* SQLiteData */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXContainerItemProxy section */
 		8729F05E2F29EC35003A1ECB /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -52,6 +56,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				87924F002F4A3921002C18EC /* SQLiteData in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -112,6 +117,7 @@
 			);
 			name = BabyTime;
 			packageProductDependencies = (
+				87DEAD000200000000000001 /* SQLiteData */,
 			);
 			productName = BabyTime;
 			productReference = 8729F0502F29EC33003A1ECB /* BabyTime.app */;
@@ -195,6 +201,9 @@
 			);
 			mainGroup = 8729F0472F29EC33003A1ECB;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				87DEAD000100000000000001 /* XCRemoteSwiftPackageReference "sqlite-data" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 8729F0512F29EC33003A1ECB /* Products */;
 			projectDirPath = "";
@@ -621,6 +630,25 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		87DEAD000100000000000001 /* XCRemoteSwiftPackageReference "sqlite-data" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/pointfreeco/sqlite-data";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 1.0.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		87DEAD000200000000000001 /* SQLiteData */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 87DEAD000100000000000001 /* XCRemoteSwiftPackageReference "sqlite-data" */;
+			productName = SQLiteData;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 8729F0482F29EC33003A1ECB /* Project object */;
 }

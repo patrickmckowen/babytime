@@ -55,7 +55,7 @@ enum NotificationScheduler {
 
             // Wake window approaching (lower bound)
             let approachingDate = wakeRef.addingTimeInterval(Double(ww.lowerBound) * 60)
-            if approachingDate > now {
+            if approachingDate > now && approachingDate < snapshot.napCutoff {
                 result.append(NotificationTrigger(
                     id: "ww-approaching",
                     fireDate: approachingDate,
@@ -66,7 +66,7 @@ enum NotificationScheduler {
 
             // Wake window exceeded (upper bound)
             let exceededDate = wakeRef.addingTimeInterval(Double(ww.upperBound) * 60)
-            if exceededDate > now {
+            if exceededDate > now && exceededDate < snapshot.napCutoff {
                 result.append(NotificationTrigger(
                     id: "ww-exceeded",
                     fireDate: exceededDate,

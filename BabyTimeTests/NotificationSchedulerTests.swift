@@ -332,6 +332,46 @@ struct NotificationSchedulerTests {
         #expect(!ids.contains("feed-ready"))
     }
 
+    @Test("WW triggers suppressed when fire date is after nap cutoff")
+    func wwTriggersSuppressedAfterNapCutoff() {
+        // Scenario: 4-month-old, bedtime 7pm, 3 completed naps, last nap ended 5 min ago.
+        // napCutoff = 19:00 - 120 min (lastWW upperBound) = 17:00
+        // currentWW (3 completed naps → index 3) = 105...120 min
+        // ww-approaching would fire at wakeRef + 105 min → well after 17:00 cutoff
+        // ww-exceeded would fire at wakeRef + 120 min → also after cutoff
+        // Both should be suppressed.
+
+        let refTime = Calendar.current.date(
+            from: DateComponents(year: 2026, month: 2, day: 20, hour: 16, minute: 20)
+        )!
+
+        let baby = makeBaby(ageDays: 120, bedtimeHour: 19, referenceDate: refTime)
+
+        // 3 completed naps earlier in the day
+        // nap3 ends at 16:15 (5 min before refTime) → wakeReference = 16:15
+        // approachingDate = 16:15 + 105 = 18:00 → AFTER napCutoff (17:00)
+        // exceededDate   = 16:15 + 120 = 18:15 → AFTER napCutoff (17:00)
+        let nap1 = makeSleep(startedMinutesAgo: 360, durationMinutes: 60, referenceDate: refTime)
+        let nap2 = makeSleep(startedMinutesAgo: 240, durationMinutes: 45, referenceDate: refTime)
+        let nap3 = makeSleep(startedMinutesAgo: 35, durationMinutes: 30, referenceDate: refTime)
+
+        let feed = makeFeed(minutesAgo: 30, referenceDate: refTime)
+
+        let snapshot = DayEngine.snapshot(
+            baby: baby, feeds: [feed], sleeps: [nap1, nap2, nap3], now: refTime
+        )
+
+        // Verify preconditions
+        #expect(snapshot.completedNaps == 3)
+        #expect(snapshot.napCutoff < refTime.addingTimeInterval(105 * 60))
+
+        let triggers = NotificationScheduler.triggers(from: snapshot, baby: baby, now: refTime)
+        let ids = triggerIDs(triggers)
+
+        #expect(!ids.contains("ww-approaching"), "Should not suggest a nap after nap cutoff")
+        #expect(!ids.contains("ww-exceeded"), "Should not report wake window ended after nap cutoff")
+    }
+
     @Test("Trigger fire dates are all in the future")
     func allTriggersInFuture() {
         let baby = makeBaby(ageDays: 90, referenceDate: now)

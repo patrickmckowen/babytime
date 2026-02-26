@@ -251,6 +251,22 @@ final class ActivityManager {
                     .update { $0.endTime = #bind(nap.startTime) }
                     .execute(db)
             }
+
+            // Dedup WakeEvents — CloudKit sync can't enforce UNIQUE, so
+            // two devices may create a WakeEvent for the same baby/day.
+            // Keep earliest, delete the rest.
+            let allWakes = try WakeEvent
+                .where { $0.babyID.eq(#bind(baby.id)) }
+                .order { $0.date.asc() }
+                .fetchAll(db)
+            var seenDates = Set<Date>()
+            for wake in allWakes {
+                if seenDates.contains(wake.date) {
+                    try WakeEvent.find(wake.id).delete().execute(db)
+                } else {
+                    seenDates.insert(wake.date)
+                }
+            }
         }
     }
 

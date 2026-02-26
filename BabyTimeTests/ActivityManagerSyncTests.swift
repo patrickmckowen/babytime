@@ -191,6 +191,44 @@ struct AutoCloseMultiDeviceTests {
             #expect(activeNursings.count == 2, "Both remote nursings should remain active")
         }
     }
+
+    @Test("Duplicate WakeEvents from sync are deduped on refresh")
+    func wakeEventDedup() {
+        withManager { manager, database, baby in
+            let today = Calendar.current.startOfDay(for: Date())
+
+            // Simulate two devices creating a WakeEvent for the same day
+            let wake1 = WakeEvent(
+                id: UUID(), babyID: baby.id,
+                date: today, time: Date().addingTimeInterval(-3600),
+                caregiverName: "Mom", deviceID: DeviceIdentity.deviceID
+            )
+            let wake2 = WakeEvent(
+                id: UUID(), babyID: baby.id,
+                date: today, time: Date(),
+                caregiverName: "Dad", deviceID: "remote-device-\(UUID().uuidString)"
+            )
+
+            try? database.write { db in
+                try WakeEvent.insert { wake1 }.execute(db)
+                try WakeEvent.insert { wake2 }.execute(db)
+            }
+
+            // Verify both exist before refresh
+            let beforeCount = (try? database.read { db in
+                try WakeEvent.where { $0.babyID.eq(#bind(baby.id)) }.fetchCount(db)
+            }) ?? 0
+            #expect(beforeCount == 2)
+
+            manager.refresh()
+
+            // After refresh, only one should remain
+            let afterCount = (try? database.read { db in
+                try WakeEvent.where { $0.babyID.eq(#bind(baby.id)) }.fetchCount(db)
+            }) ?? 0
+            #expect(afterCount == 1, "Duplicate WakeEvents should be deduped to one per date")
+        }
+    }
 }
 
 // MARK: - SyncDelegate Tests

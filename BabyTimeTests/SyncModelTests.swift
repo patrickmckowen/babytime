@@ -286,11 +286,11 @@ struct WakeEventCRUDTests {
 
 // MARK: - WakeEvent Uniqueness Tests
 
-@Suite("SyncModels — WakeEvent Uniqueness")
-struct WakeEventUniquenessTests {
+@Suite("SyncModels — WakeEvent Dedup")
+struct WakeEventDedupTests {
 
-    @Test("Unique index prevents duplicate WakeEvent for same baby and date")
-    func uniqueConstraint() throws {
+    @Test("Duplicate WakeEvents allowed at DB level (no UNIQUE — CloudKit requirement)")
+    func duplicatesAllowed() throws {
         try withDatabase { db in
             let babyID = UUID()
             let baby = Baby(
@@ -301,29 +301,18 @@ struct WakeEventUniquenessTests {
                 createdAt: Date()
             )
             let today = Calendar.current.startOfDay(for: Date())
-            let wake1 = WakeEvent(
-                id: UUID(),
-                babyID: babyID,
-                date: today,
-                time: Date()
-            )
             try db.write { db in
                 try Baby.insert { baby }.execute(db)
-                try WakeEvent.insert { wake1 }.execute(db)
+                try WakeEvent.insert {
+                    WakeEvent(id: UUID(), babyID: babyID, date: today, time: Date())
+                }.execute(db)
+                try WakeEvent.insert {
+                    WakeEvent(id: UUID(), babyID: babyID, date: today, time: Date().addingTimeInterval(3600))
+                }.execute(db)
             }
-
-            // Second insert with same babyID + date should fail
-            let wake2 = WakeEvent(
-                id: UUID(),
-                babyID: babyID,
-                date: today,
-                time: Date().addingTimeInterval(3600)
-            )
-            #expect(throws: (any Error).self) {
-                try db.write { db in
-                    try WakeEvent.insert { wake2 }.execute(db)
-                }
-            }
+            // Both inserts succeed — dedup happens at application level
+            let count = try db.read { db in try WakeEvent.fetchCount(db) }
+            #expect(count == 2)
         }
     }
 
@@ -374,8 +363,8 @@ struct WakeEventUniquenessTests {
         }
     }
 
-    @Test("Unique index exists after migration")
-    func uniqueIndexExists() throws {
+    @Test("Composite index exists after migration")
+    func compositeIndexExists() throws {
         try withDatabase { db in
             let indexes = try db.read { db in
                 try String.fetchAll(

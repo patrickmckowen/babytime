@@ -170,11 +170,15 @@ Tests use in-memory `DatabaseQueue` with no SyncEngine — no test breakage.
 `.signOut` / `.switchAccounts`. The user can keep local data or call
 `syncEngine.deleteLocalData()` to reset.
 
-### WakeEvent Unique Constraint
-Migration "Add WakeEvent uniqueness + dedup" adds
-`UNIQUE INDEX (babyID, date)` on `syncWakeEvents`. Existing duplicates
-are deduped first (earliest rowid kept). The existing query-then-upsert
-pattern in `setWakeTime()` is preserved.
+### WakeEvent Dedup (Application-Level)
+SQLiteData's SyncEngine does not allow UNIQUE constraints on synchronized
+tables — CloudKit sync can produce temporary duplicates during conflict
+resolution. Migration "Add WakeEvent composite index + dedup" adds a
+non-unique composite index `(babyID, date)` for query performance and
+deduplicates existing rows. Ongoing dedup runs in `autoCloseStaleEvents()`
+on every `refresh()` — keeps earliest WakeEvent per baby/date, deletes
+the rest. The existing query-then-upsert pattern in `setWakeTime()` is
+preserved.
 
 ### autoCloseStaleEvents — Multi-Device Filter
 Duplicate-closing for active nursings and naps now filters by

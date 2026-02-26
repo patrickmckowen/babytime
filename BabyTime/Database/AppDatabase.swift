@@ -136,8 +136,8 @@ extension DependencyValues {
             .execute(db)
         }
 
-        migrator.registerMigration("Add WakeEvent uniqueness + dedup") { db in
-            // Delete duplicates first (keep earliest by rowid for determinism)
+        migrator.registerMigration("Add WakeEvent composite index + dedup") { db in
+            // One-time dedup of any existing duplicates (keep earliest by rowid)
             try #sql("""
                 DELETE FROM "syncWakeEvents"
                 WHERE rowid NOT IN (
@@ -146,8 +146,10 @@ extension DependencyValues {
                 )
             """).execute(db)
 
+            // Non-unique — CloudKit sync can't have UNIQUE constraints on synced tables.
+            // Application-level dedup runs in autoCloseStaleEvents() instead.
             try #sql("""
-                CREATE UNIQUE INDEX IF NOT EXISTS "idx_syncWakeEvents_babyID_date"
+                CREATE INDEX IF NOT EXISTS "idx_syncWakeEvents_babyID_date"
                 ON "syncWakeEvents"("babyID", "date")
             """).execute(db)
         }

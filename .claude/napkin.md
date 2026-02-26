@@ -29,6 +29,7 @@
 | 2026-02-20 | self | Files reverted by external process (linter/hook) during multi-file edit — SleepCard.swift overwritten, TimePickerSheet.swift deleted | After writing files, verify they exist and contain expected content before moving on. Re-read and re-apply if reverted |
 | 2026-02-20 | self | `git checkout -b` succeeded but later `git status` showed wrong branch | After creating branches, always verify with `git branch --show-current` before committing |
 | 2026-02-21 | self | After overnight wake (logWakeUp before 5 AM), snapshot fell to `notStarted` because cross-day night sleep wasn't in todaySleeps and was no longer active | Completed cross-day night sleeps (endTime >= startOfDay) must also be included in snapshot — not just active ones. Check for "ghost" data that falls outside today-scoped queries |
+| 2026-02-25 | self | `Row` type not available via `import SQLiteData` — build error "cannot find type 'Row' in scope" | `import GRDB` explicitly when using GRDB-specific types like `Row`, `Database` (for function signatures), `Statement`. SQLiteData re-exports most GRDB types but not all |
 
 ## User Preferences
 - Ask questions, don't guess or assume

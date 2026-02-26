@@ -292,6 +292,18 @@ final class ActivityManager {
                     .update { $0.endTime = #bind(now) }
                     .execute(db)
             }
+        } else {
+            // Persist any user edits to start/end times
+            let startTime = event.startTime
+            let endTime = event.endTime
+            try? database.write { db in
+                try FeedEvent.find(event.id)
+                    .update {
+                        $0.startTime = #bind(startTime)
+                        $0.endTime = #bind(endTime)
+                    }
+                    .execute(db)
+            }
         }
         activeNursingEvent = nil
         refresh()
@@ -395,6 +407,18 @@ final class ActivityManager {
             try? database.write { db in
                 try SleepEvent.find(event.id)
                     .update { $0.endTime = #bind(now) }
+                    .execute(db)
+            }
+        } else {
+            // Persist any user edits to start/end times
+            let startTime = event.startTime
+            let endTime = event.endTime
+            try? database.write { db in
+                try SleepEvent.find(event.id)
+                    .update {
+                        $0.startTime = #bind(startTime)
+                        $0.endTime = #bind(endTime)
+                    }
                     .execute(db)
             }
         }

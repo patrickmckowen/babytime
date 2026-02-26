@@ -147,6 +147,47 @@ yet-saved event.
 **Critical rule:** Only scan when reference `== nil`. Never overwrite a
 non-nil reference with a sync discovery.
 
+## CloudKit Private Sync (Phase 5)
+
+### SyncEngine Initialization
+SyncEngine is created in `BabyTimeApp.init()` **after** `bootstrapDatabase()`,
+keeping the database bootstrap signature unchanged. All four tables are passed
+via `tables:` (not `privateTables:`) so they remain shareable for Phase 6.
+
+```swift
+$0.defaultSyncEngine = try! SyncEngine(
+    for: $0.defaultDatabase,
+    tables: Baby.self, FeedEvent.self, SleepEvent.self, WakeEvent.self,
+    containerIdentifier: "iCloud.com.patrickmckowen.BabyTime",
+    delegate: delegate
+)
+```
+
+Tests use in-memory `DatabaseQueue` with no SyncEngine — no test breakage.
+
+### SyncDelegate (Account Changes)
+`SyncDelegate` implements `SyncEngineDelegate` and shows an alert on
+`.signOut` / `.switchAccounts`. The user can keep local data or call
+`syncEngine.deleteLocalData()` to reset.
+
+### WakeEvent Unique Constraint
+Migration "Add WakeEvent uniqueness + dedup" adds
+`UNIQUE INDEX (babyID, date)` on `syncWakeEvents`. Existing duplicates
+are deduped first (earliest rowid kept). The existing query-then-upsert
+pattern in `setWakeTime()` is preserved.
+
+### autoCloseStaleEvents — Multi-Device Filter
+Duplicate-closing for active nursings and naps now filters by
+`DeviceIdentity.deviceID` so Device A cannot close Device B's legitimate
+active event. **Stale night sleep closure (>48h) remains global** — a
+48-hour-old event is genuinely stale regardless of origin.
+
+### Real-Time Refresh (DatabaseRegionObservation)
+`ActivityManager` observes all four sync tables via GRDB's
+`DatabaseRegionObservation`. When CloudKit pushes changes and SQLiteData
+writes them locally, the observer triggers `loadBabies()` + `refresh()`.
+The existing `scenePhase == .active` handler stays as a safety net.
+
 ## WakeEvent Upsert Pattern
 
 One WakeEvent per baby per day. Query for existing before creating.
@@ -171,7 +212,7 @@ Last-write-wins is acceptable (wake time is the same either way).
 | 3. View updates | **Complete** | SwiftData imports removed, bindings use ActivityManager |
 | 4. Test migration | **Complete** | 109 tests across 22 suites passing |
 | 4a. SwiftData → SQLite data migration | **Complete** | One-time first-launch migration via GRDB raw SQL; idempotent via UserDefaults flag |
-| 5. CloudKit private sync | Not started | Depends on Phases 1-4 |
+| 5. CloudKit private sync | **Complete** | SyncEngine init, SyncDelegate, DatabaseRegionObservation, WakeEvent unique constraint, autoClose deviceID filter |
 | 6. CloudKit sharing (CKShare) | Not started | Depends on Phase 5 |
 | 7. Polish (migration, cleanup, sync UI) | Not started | Depends on Phase 6 |
 
@@ -180,6 +221,7 @@ Last-write-wins is acceptable (wake time is the same either way).
 ### Database layer
 - `BabyTime/Database/Models.swift` — `@Table` structs (Baby, FeedEvent, SleepEvent, WakeEvent)
 - `BabyTime/Database/AppDatabase.swift` — database setup + DependencyValues extensions
+- `BabyTime/Database/SyncDelegate.swift` — SyncEngineDelegate for iCloud account changes
 - `BabyTime/Database/SwiftDataMigrator.swift` — one-time migration from old SwiftData (CoreData) store
 - `BabyTimeTests/SyncModelTests.swift` — schema verification and CRUD tests
 - `BabyTimeTests/SwiftDataMigrationTests.swift` — migration logic tests

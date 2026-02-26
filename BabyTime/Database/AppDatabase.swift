@@ -136,6 +136,22 @@ extension DependencyValues {
             .execute(db)
         }
 
+        migrator.registerMigration("Add WakeEvent uniqueness + dedup") { db in
+            // Delete duplicates first (keep earliest by rowid for determinism)
+            try #sql("""
+                DELETE FROM "syncWakeEvents"
+                WHERE rowid NOT IN (
+                    SELECT MIN(rowid) FROM "syncWakeEvents"
+                    GROUP BY "babyID", "date"
+                )
+            """).execute(db)
+
+            try #sql("""
+                CREATE UNIQUE INDEX IF NOT EXISTS "idx_syncWakeEvents_babyID_date"
+                ON "syncWakeEvents"("babyID", "date")
+            """).execute(db)
+        }
+
         try migrator.migrate(database)
     }
 }

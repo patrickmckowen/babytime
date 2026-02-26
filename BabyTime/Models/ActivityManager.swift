@@ -7,6 +7,7 @@
 //
 
 import Foundation
+import GRDB
 import SwiftUI
 import SQLiteData
 import UserNotifications
@@ -27,6 +28,10 @@ final class ActivityManager {
     private(set) var todaySleeps: [SleepEvent] = []
     private(set) var todayWakeEvent: WakeEvent?
 
+    // MARK: - Database Observation
+
+    private var observer: AnyDatabaseCancellable?
+
     // MARK: - Active Event References
 
     private(set) var activeNursingEvent: FeedEvent?
@@ -37,6 +42,24 @@ final class ActivityManager {
     init(database: any DatabaseWriter) {
         self.database = database
         loadBabies()
+        startObservation()
+    }
+
+    private func startObservation() {
+        let observation = DatabaseRegionObservation(tracking:
+            Table("syncBabies"),
+            Table("syncFeedEvents"),
+            Table("syncSleepEvents"),
+            Table("syncWakeEvents")
+        )
+        observer = observation.start(in: database, onError: { _ in },
+            onChange: { [weak self] _ in
+                Task { @MainActor [weak self] in
+                    self?.loadBabies()
+                    self?.refresh()
+                }
+            }
+        )
     }
 
     // MARK: - Baby Management
@@ -208,8 +231,9 @@ final class ActivityManager {
                     .execute(db)
             }
 
+            let localDeviceID = DeviceIdentity.deviceID
             let activeNursings = try FeedEvent
-                .where { $0.babyID.eq(#bind(baby.id)) && $0.feedKind.eq(#bind(FeedKind.nursing)) && $0.endTime.is(nil) }
+                .where { $0.babyID.eq(#bind(baby.id)) && $0.feedKind.eq(#bind(FeedKind.nursing)) && $0.endTime.is(nil) && $0.deviceID.eq(#bind(localDeviceID)) }
                 .order { $0.startTime.asc() }
                 .fetchAll(db)
             for event in activeNursings.dropFirst() {
@@ -219,7 +243,7 @@ final class ActivityManager {
             }
 
             let activeNaps = try SleepEvent
-                .where { $0.babyID.eq(#bind(baby.id)) && $0.isNightSleep.eq(false) && $0.endTime.is(nil) }
+                .where { $0.babyID.eq(#bind(baby.id)) && $0.isNightSleep.eq(false) && $0.endTime.is(nil) && $0.deviceID.eq(#bind(localDeviceID)) }
                 .order { $0.startTime.asc() }
                 .fetchAll(db)
             for nap in activeNaps.dropFirst() {

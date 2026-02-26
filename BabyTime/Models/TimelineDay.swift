@@ -6,7 +6,6 @@
 //
 
 import Foundation
-import SwiftData
 
 // MARK: - Log Entry
 
@@ -14,10 +13,10 @@ enum LogEntry: Identifiable {
     case feed(FeedEvent)
     case sleep(SleepEvent)
 
-    var id: PersistentIdentifier {
+    var id: UUID {
         switch self {
-        case .feed(let e): return e.persistentModelID
-        case .sleep(let e): return e.persistentModelID
+        case .feed(let e): return e.id
+        case .sleep(let e): return e.id
         }
     }
 

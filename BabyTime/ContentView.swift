@@ -5,8 +5,8 @@
 //  Created by Patrick McKowen on 1/27/26.
 //
 
+import Dependencies
 import SwiftUI
-import SwiftData
 import PhotosUI
 
 struct ContentView: View {
@@ -108,11 +108,12 @@ struct ContentView: View {
 }
 
 #Preview {
-    let container = try! ModelContainer(
-        for: Baby.self, FeedEvent.self, SleepEvent.self, WakeEvent.self,
-        configurations: ModelConfiguration(isStoredInMemoryOnly: true)
-    )
+    let manager = withDependencies {
+        try! $0.bootstrapTestDatabase()
+    } operation: {
+        @Dependency(\.defaultDatabase) var database
+        return ActivityManager(database: database)
+    }
     ContentView()
-        .environment(ActivityManager(modelContext: container.mainContext))
-        .modelContainer(container)
+        .environment(manager)
 }

@@ -4,11 +4,11 @@
 //
 //  Sleep session sheet: start/stop timer, editable times, save/reset.
 //  Supports both live timer and manual past-sleep logging.
-//  Timer persists immediately to SwiftData for multi-device sync.
+//  Timer persists immediately to SQLiteData for multi-device sync.
 //
 
+import Dependencies
 import SwiftUI
-import SwiftData
 
 struct SleepSheetView: View {
     @Environment(ActivityManager.self) private var activityManager
@@ -271,10 +271,12 @@ struct SleepSheetView: View {
 }
 
 #Preview {
-    let container = try! ModelContainer(
-        for: Baby.self, FeedEvent.self, SleepEvent.self, WakeEvent.self,
-        configurations: ModelConfiguration(isStoredInMemoryOnly: true)
-    )
+    let manager = withDependencies {
+        try! $0.bootstrapTestDatabase()
+    } operation: {
+        @Dependency(\.defaultDatabase) var database
+        return ActivityManager(database: database)
+    }
     SleepSheetView()
-        .environment(ActivityManager(modelContext: container.mainContext))
+        .environment(manager)
 }

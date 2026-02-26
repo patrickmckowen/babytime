@@ -6,7 +6,6 @@
 //
 
 import SwiftUI
-import SwiftData
 import PhotosUI
 
 struct SettingsView: View {
@@ -49,7 +48,7 @@ struct SettingsView: View {
             LabeledField(label: "Name") {
                 TextField("Name", text: Binding(
                     get: { baby.name },
-                    set: { baby.name = $0 }
+                    set: { newName in activityManager.updateBaby { $0.name = newName } }
                 ))
                 .textContentType(.name)
             }
@@ -59,7 +58,7 @@ struct SettingsView: View {
                     "",
                     selection: Binding(
                         get: { baby.birthdate },
-                        set: { baby.birthdate = $0 }
+                        set: { newDate in activityManager.updateBaby { $0.birthdate = newDate } }
                     ),
                     displayedComponents: .date
                 )
@@ -110,7 +109,7 @@ struct SettingsView: View {
                 HStack {
                     Toggle("", isOn: Binding(
                         get: { baby.dreamFeedEnabled },
-                        set: { baby.dreamFeedEnabled = $0 }
+                        set: { newValue in activityManager.updateBaby { $0.dreamFeedEnabled = newValue } }
                     ))
                     .labelsHidden()
 
@@ -209,7 +208,7 @@ struct SettingsView: View {
     private func feedIntervalBinding(_ baby: Baby) -> Binding<Int> {
         Binding(
             get: { baby.customFeedIntervalMinutes },
-            set: { baby.customFeedIntervalMinutes = $0 }
+            set: { newValue in activityManager.updateBaby { $0.customFeedIntervalMinutes = newValue } }
         )
     }
 
@@ -223,8 +222,10 @@ struct SettingsView: View {
             },
             set: { date in
                 let components = Calendar.current.dateComponents([.hour, .minute], from: date)
-                baby.bedtimeHour = components.hour ?? 19
-                baby.bedtimeMinute = components.minute ?? 0
+                activityManager.updateBaby {
+                    $0.bedtimeHour = components.hour ?? 19
+                    $0.bedtimeMinute = components.minute ?? 0
+                }
             }
         )
     }
@@ -239,8 +240,10 @@ struct SettingsView: View {
             },
             set: { date in
                 let components = Calendar.current.dateComponents([.hour, .minute], from: date)
-                baby.dreamFeedHour = components.hour ?? 22
-                baby.dreamFeedMinute = components.minute ?? 30
+                activityManager.updateBaby {
+                    $0.dreamFeedHour = components.hour ?? 22
+                    $0.dreamFeedMinute = components.minute ?? 30
+                }
             }
         )
     }

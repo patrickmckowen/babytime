@@ -5,35 +5,40 @@
 //  Created by Patrick McKowen on 1/27/26.
 //
 
+import Dependencies
 import SwiftUI
-import SwiftData
+import UserNotifications
 
 @main
 struct BabyTimeApp: App {
-    let container: ModelContainer
     @State private var activityManager: ActivityManager
     @Environment(\.scenePhase) private var scenePhase
 
     init() {
-        let container: ModelContainer
+        UNUserNotificationCenter.current().delegate = NotificationManager.delegate
+        let manager: ActivityManager
         if ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil {
-            let config = ModelConfiguration("test-host", isStoredInMemoryOnly: true, cloudKitDatabase: .none)
-            container = try! ModelContainer(
-                for: Baby.self, FeedEvent.self, SleepEvent.self, WakeEvent.self,
-                configurations: config
-            )
+            manager = withDependencies {
+                try! $0.bootstrapTestDatabase()
+            } operation: {
+                @Dependency(\.defaultDatabase) var database
+                return ActivityManager(database: database)
+            }
         } else {
-            container = try! ModelContainer(for: Baby.self, FeedEvent.self, SleepEvent.self, WakeEvent.self)
+            manager = withDependencies {
+                try! $0.bootstrapDatabase()
+            } operation: {
+                @Dependency(\.defaultDatabase) var database
+                return ActivityManager(database: database)
+            }
         }
-        self.container = container
-        self._activityManager = State(initialValue: ActivityManager(modelContext: container.mainContext))
+        self._activityManager = State(initialValue: manager)
     }
 
     var body: some Scene {
         WindowGroup {
             ContentView()
                 .environment(activityManager)
-                .modelContainer(container)
                 .preferredColorScheme(.light)
                 .onChange(of: scenePhase) { _, newPhase in
                     if newPhase == .active {

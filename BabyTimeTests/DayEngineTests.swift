@@ -16,6 +16,7 @@ private func makeBaby(
     ageDays: Int,
     bedtimeHour: Int = 19,
     bedtimeMinute: Int = 0,
+    customFeedIntervalMinutes: Int = 0,
     referenceDate: Date = Date()
 ) -> Baby {
     let birthdate = Calendar.current.date(
@@ -25,7 +26,8 @@ private func makeBaby(
         name: "Test",
         birthdate: birthdate,
         bedtimeHour: bedtimeHour,
-        bedtimeMinute: bedtimeMinute
+        bedtimeMinute: bedtimeMinute,
+        customFeedIntervalMinutes: customFeedIntervalMinutes
     )
 }
 
@@ -604,8 +606,7 @@ struct CustomFeedIntervalTests {
 
     @Test("Custom 120-min interval overrides AgeTable default")
     func customIntervalOverride() {
-        let baby = makeBaby(ageDays: 90, referenceDate: now)
-        baby.customFeedIntervalMinutes = 120 // 2 hours
+        let baby = makeBaby(ageDays: 90, customFeedIntervalMinutes: 120, referenceDate: now)
 
         // 100 min ago: 80% of 120 = 96 → approaching with custom range
         let feed = makeFeed(minutesAgo: 100, referenceDate: now)
@@ -624,8 +625,7 @@ struct CustomFeedIntervalTests {
 
     @Test("Custom interval: ready when past custom threshold")
     func customIntervalReady() {
-        let baby = makeBaby(ageDays: 90, referenceDate: now)
-        baby.customFeedIntervalMinutes = 120
+        let baby = makeBaby(ageDays: 90, customFeedIntervalMinutes: 120, referenceDate: now)
 
         // 130 min ago: past 120 → ready
         let feed = makeFeed(minutesAgo: 130, referenceDate: now)
@@ -644,8 +644,7 @@ struct CustomFeedIntervalTests {
 
     @Test("Custom interval: recentlyFed when well within interval")
     func customIntervalRecentlyFed() {
-        let baby = makeBaby(ageDays: 90, referenceDate: now)
-        baby.customFeedIntervalMinutes = 120
+        let baby = makeBaby(ageDays: 90, customFeedIntervalMinutes: 120, referenceDate: now)
 
         // 60 min ago: well under 80% of 120 (96) → recentlyFed
         let feed = makeFeed(minutesAgo: 60, referenceDate: now)

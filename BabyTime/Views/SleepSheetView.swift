@@ -123,7 +123,7 @@ struct SleepSheetView: View {
     // MARK: - Timer Display
 
     private func durationString(at date: Date) -> String {
-        guard let start = effectiveStartTime else { return "00:00" }
+        guard let start = effectiveStartTime else { return "00 : 00 : 00" }
 
         let reference: Date
         if activityManager.isSleepActive {
@@ -131,20 +131,21 @@ struct SleepSheetView: View {
         } else if let end = effectiveEndTime {
             reference = end                       // static stopped/draft duration
         } else {
-            return "00:00"                        // draft start only → no duration yet
+            return "00 : 00 : 00"                 // draft start only → no duration yet
         }
 
         let elapsed = max(0, reference.timeIntervalSince(start))
-        let minutes = Int(elapsed) / 60
+        let hours = Int(elapsed) / 3600
+        let minutes = (Int(elapsed) % 3600) / 60
         let seconds = Int(elapsed) % 60
-        return String(format: "%02d:%02d", minutes, seconds)
+        return String(format: "%02d : %02d : %02d", hours, minutes, seconds)
     }
 
     private var timerDisplay: some View {
         VStack(spacing: 8) {
             SwiftUI.TimelineView(.periodic(from: .now, by: 1)) { context in
                 Text(durationString(at: context.date))
-                    .font(.system(size: 72, weight: .regular, design: .default))
+                    .font(.system(size: 72, weight: .bold))
                     .monospacedDigit()
                     .tracking(-2)
                     .foregroundStyle(Color.btTextPrimary)

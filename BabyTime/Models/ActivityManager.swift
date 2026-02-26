@@ -2,13 +2,13 @@
 //  ActivityManager.swift
 //  BabyTime
 //
-//  Observable data manager bridging SwiftData ↔ DayEngine ↔ Views.
+//  Observable data manager bridging SQLiteData ↔ DayEngine ↔ Views.
 //  Persists active timers immediately for multi-device sync + crash recovery.
 //
 
 import Foundation
 import SwiftUI
-import SwiftData
+import SQLiteData
 import UserNotifications
 
 @Observable
@@ -16,7 +16,7 @@ final class ActivityManager {
 
     // MARK: - Core State
 
-    private(set) var modelContext: ModelContext
+    private let database: any DatabaseWriter
     private(set) var baby: Baby?
     private(set) var allBabies: [Baby] = []
 
@@ -29,18 +29,13 @@ final class ActivityManager {
 
     // MARK: - Active Event References
 
-    /// Active nursing event. Updated from data on every refresh() cycle,
-    /// so external writes (from another device via CloudKit) are discovered
-    /// automatically when the app returns to foreground.
     private(set) var activeNursingEvent: FeedEvent?
-
-    /// Active sleep event (nap only, not nighttime sleep).
     private(set) var activeSleepEvent: SleepEvent?
 
     // MARK: - Init
 
-    init(modelContext: ModelContext) {
-        self.modelContext = modelContext
+    init(database: any DatabaseWriter) {
+        self.database = database
         loadBabies()
     }
 
@@ -63,6 +58,8 @@ final class ActivityManager {
         photoData: Data? = nil
     ) -> Baby {
         let baby = Baby(
+            id: UUID(),
+            stableID: UUID().uuidString,
             name: name,
             birthdate: birthdate,
             bedtimeHour: bedtimeHour,
@@ -70,18 +67,21 @@ final class ActivityManager {
             dreamFeedEnabled: dreamFeedEnabled,
             dreamFeedHour: dreamFeedHour,
             dreamFeedMinute: dreamFeedMinute,
-            photoData: photoData
+            photoData: photoData,
+            createdAt: Date()
         )
-        modelContext.insert(baby)
-        save()
+        try? database.write { db in
+            try Baby.insert { baby }.execute(db)
+        }
         loadBabies()
         return baby
     }
 
     func deleteBaby(_ baby: Baby) {
         let wasSelected = self.baby?.stableID == baby.stableID
-        modelContext.delete(baby)
-        save()
+        try? database.write { db in
+            try Baby.find(baby.id).delete().execute(db)
+        }
         loadBabies()
         if wasSelected {
             self.baby = allBabies.first
@@ -92,8 +92,9 @@ final class ActivityManager {
     // MARK: - Data Loading
 
     func loadBabies() {
-        let descriptor = FetchDescriptor<Baby>(sortBy: [SortDescriptor(\.createdAt)])
-        allBabies = (try? modelContext.fetch(descriptor)) ?? []
+        allBabies = (try? database.read { db in
+            try Baby.order { $0.createdAt.asc() }.fetchAll(db)
+        }) ?? []
     }
 
     func refresh() {
@@ -104,10 +105,6 @@ final class ActivityManager {
         scheduleNotifications()
     }
 
-    /// Discover active events from the full relationship, including events
-    /// created by other devices via CloudKit sync. Called every refresh cycle.
-    /// Only scans when no event is currently tracked — stopped events are
-    /// preserved until the user explicitly saves or resets them.
     private func syncActiveEvents() {
         guard let baby else {
             activeNursingEvent = nil
@@ -116,13 +113,19 @@ final class ActivityManager {
         }
 
         if activeNursingEvent == nil {
-            let feeds = baby.feedEvents ?? []
-            activeNursingEvent = feeds.first { $0.kind == .nursing && $0.isActive }
+            activeNursingEvent = try? database.read { db in
+                try FeedEvent
+                    .where { $0.babyID.eq(#bind(baby.id)) && $0.endTime.is(nil) && $0.feedKind.eq(#bind(FeedKind.nursing)) }
+                    .fetchOne(db)
+            }
         }
 
         if activeSleepEvent == nil {
-            let sleeps = baby.sleepEvents ?? []
-            activeSleepEvent = sleeps.first { $0.isActive && !$0.isNightSleep }
+            activeSleepEvent = try? database.read { db in
+                try SleepEvent
+                    .where { $0.babyID.eq(#bind(baby.id)) && $0.endTime.is(nil) && $0.isNightSleep.eq(false) }
+                    .fetchOne(db)
+            }
         }
     }
 
@@ -131,8 +134,9 @@ final class ActivityManager {
             UNUserNotificationCenter.current().removeAllPendingNotificationRequests()
             return
         }
-        let triggers = NotificationScheduler.triggers(from: snapshot, baby: baby, now: Date())
-        NotificationManager.reschedule(triggers)
+        let prefix = "\(baby.id.uuidString.prefix(8))-"
+        let triggers = NotificationScheduler.triggers(from: snapshot, baby: baby, now: Date(), idPrefix: prefix)
+        NotificationManager.reschedule(triggers, removingPrefix: prefix)
     }
 
     private func loadTodayEvents() {
@@ -145,18 +149,25 @@ final class ActivityManager {
 
         let startOfDay = Calendar.current.startOfDay(for: Date())
 
-        let allFeeds = baby.feedEvents ?? []
-        todayFeeds = allFeeds
-            .filter { $0.startTime >= startOfDay }
-            .sorted { $0.startTime < $1.startTime }
+        todayFeeds = (try? database.read { db in
+            try FeedEvent
+                .where { $0.babyID.eq(#bind(baby.id)) && $0.startTime >= #bind(startOfDay) }
+                .order { $0.startTime.asc() }
+                .fetchAll(db)
+        }) ?? []
 
-        let allSleeps = baby.sleepEvents ?? []
-        todaySleeps = allSleeps
-            .filter { $0.startTime >= startOfDay }
-            .sorted { $0.startTime < $1.startTime }
+        todaySleeps = (try? database.read { db in
+            try SleepEvent
+                .where { $0.babyID.eq(#bind(baby.id)) && $0.startTime >= #bind(startOfDay) }
+                .order { $0.startTime.asc() }
+                .fetchAll(db)
+        }) ?? []
 
-        let allWakes = baby.wakeEvents ?? []
-        todayWakeEvent = allWakes.first { $0.date == startOfDay }
+        todayWakeEvent = try? database.read { db in
+            try WakeEvent
+                .where { $0.babyID.eq(#bind(baby.id)) && $0.date.eq(#bind(startOfDay)) }
+                .fetchOne(db)
+        }
     }
 
     private func computeSnapshot() {
@@ -164,16 +175,13 @@ final class ActivityManager {
             snapshot = nil
             return
         }
-        // Include cross-day night sleeps so the engine sees them:
-        // - Active night sleep (baby still sleeping from yesterday)
-        // - Completed night sleep that ended today (wake reference after overnight wakes)
         var sleeps = todaySleeps
         if let nightSleep = activeNightSleep,
-           !sleeps.contains(where: { $0.persistentModelID == nightSleep.persistentModelID }) {
+           !sleeps.contains(where: { $0.id == nightSleep.id }) {
             sleeps.append(nightSleep)
         }
         if let completedNight = lastCompletedNightSleepEndedToday,
-           !sleeps.contains(where: { $0.persistentModelID == completedNight.persistentModelID }) {
+           !sleeps.contains(where: { $0.id == completedNight.id }) {
             sleeps.append(completedNight)
         }
         snapshot = DayEngine.snapshot(
@@ -185,38 +193,40 @@ final class ActivityManager {
         )
     }
 
-    /// Auto-close stale events and resolve multi-writer conflicts.
-    /// Called on baby selection and refresh to clean up data from any source.
     private func autoCloseStaleEvents() {
         guard let baby else { return }
 
-        let sleeps = baby.sleepEvents ?? []
+        try? database.write { db in
+            let staleThreshold = Date().addingTimeInterval(-48 * 60 * 60)
+            let staleSleeps = try SleepEvent
+                .where { $0.babyID.eq(#bind(baby.id)) && $0.isNightSleep.eq(true) && $0.endTime.is(nil) && $0.startTime < #bind(staleThreshold) }
+                .fetchAll(db)
+            for sleep in staleSleeps {
+                let closeTime = sleep.startTime.addingTimeInterval(8 * 60 * 60)
+                try SleepEvent.find(sleep.id)
+                    .update { $0.endTime = #bind(closeTime) }
+                    .execute(db)
+            }
 
-        // Close orphaned night sleeps older than 48 hours (safety net for truly stale data).
-        // Recent night sleeps stay active until the parent explicitly taps "Woke up".
-        let staleThreshold = Date().addingTimeInterval(-48 * 60 * 60)
-        for sleep in sleeps where sleep.isNightSleep && sleep.isActive && sleep.startTime < staleThreshold {
-            sleep.endTime = sleep.startTime.addingTimeInterval(8 * 60 * 60)
-        }
+            let activeNursings = try FeedEvent
+                .where { $0.babyID.eq(#bind(baby.id)) && $0.feedKind.eq(#bind(FeedKind.nursing)) && $0.endTime.is(nil) }
+                .order { $0.startTime.asc() }
+                .fetchAll(db)
+            for event in activeNursings.dropFirst() {
+                try FeedEvent.find(event.id)
+                    .update { $0.endTime = #bind(event.startTime) }
+                    .execute(db)
+            }
 
-        // Auto-resolve feed conflicts: keep earliest active nursing, close later ones
-        let activeNursings = (baby.feedEvents ?? [])
-            .filter { $0.kind == .nursing && $0.isActive }
-            .sorted { $0.startTime < $1.startTime }
-        for event in activeNursings.dropFirst() {
-            event.endTime = event.startTime
-        }
-
-        // Auto-resolve sleep conflicts: keep earliest active nap, close later ones
-        let activeNaps = sleeps
-            .filter { $0.isActive && !$0.isNightSleep }
-            .sorted { $0.startTime < $1.startTime }
-        for event in activeNaps.dropFirst() {
-            event.endTime = event.startTime
-        }
-
-        if !activeNursings.dropFirst().isEmpty || !activeNaps.dropFirst().isEmpty {
-            save()
+            let activeNaps = try SleepEvent
+                .where { $0.babyID.eq(#bind(baby.id)) && $0.isNightSleep.eq(false) && $0.endTime.is(nil) }
+                .order { $0.startTime.asc() }
+                .fetchAll(db)
+            for nap in activeNaps.dropFirst() {
+                try SleepEvent.find(nap.id)
+                    .update { $0.endTime = #bind(nap.startTime) }
+                    .execute(db)
+            }
         }
     }
 
@@ -225,35 +235,49 @@ final class ActivityManager {
     func startNursing(at startTime: Date? = nil, side: NursingSide = .both) {
         guard let baby else { return }
         let event = FeedEvent(
+            id: UUID(),
+            babyID: baby.id,
             startTime: startTime ?? Date(),
-            kind: .nursing,
-            side: side,
-            baby: baby
+            feedKind: .nursing,
+            nursingSide: side,
+            caregiverName: DeviceIdentity.caregiverName,
+            deviceID: DeviceIdentity.deviceID
         )
-        modelContext.insert(event)
-        save()
+        try? database.write { db in
+            try FeedEvent.insert { event }.execute(db)
+        }
         activeNursingEvent = event
         refresh()
     }
 
     func resumeNursing() {
         guard let event = activeNursingEvent else { return }
-        event.endTime = nil
-        save()
+        try? database.write { db in
+            try FeedEvent.find(event.id)
+                .update { $0.endTime = #bind(nil as Date?) }
+                .execute(db)
+        }
+        activeNursingEvent?.endTime = nil
         refresh()
     }
 
     func stopNursing() {
         guard let event = activeNursingEvent, event.isActive else { return }
-        event.endTime = Date()
-        save()
+        let now = Date()
+        try? database.write { db in
+            try FeedEvent.find(event.id)
+                .update { $0.endTime = #bind(now) }
+                .execute(db)
+        }
+        activeNursingEvent?.endTime = now
         refresh()
     }
 
     func resetNursing() {
         if let event = activeNursingEvent {
-            modelContext.delete(event)
-            save()
+            try? database.write { db in
+                try FeedEvent.find(event.id).delete().execute(db)
+            }
         }
         activeNursingEvent = nil
         refresh()
@@ -262,9 +286,13 @@ final class ActivityManager {
     func saveNursing() {
         guard let event = activeNursingEvent else { return }
         if event.isActive {
-            event.endTime = Date()
+            let now = Date()
+            try? database.write { db in
+                try FeedEvent.find(event.id)
+                    .update { $0.endTime = #bind(now) }
+                    .execute(db)
+            }
         }
-        save()
         activeNursingEvent = nil
         refresh()
     }
@@ -272,14 +300,18 @@ final class ActivityManager {
     func saveNursingManual(startTime: Date, endTime: Date) {
         guard let baby else { return }
         let event = FeedEvent(
+            id: UUID(),
+            babyID: baby.id,
             startTime: startTime,
             endTime: endTime,
-            kind: .nursing,
-            side: .both,
-            baby: baby
+            feedKind: .nursing,
+            nursingSide: .both,
+            caregiverName: DeviceIdentity.caregiverName,
+            deviceID: DeviceIdentity.deviceID
         )
-        modelContext.insert(event)
-        save()
+        try? database.write { db in
+            try FeedEvent.insert { event }.execute(db)
+        }
         activeNursingEvent = nil
         refresh()
     }
@@ -289,15 +321,19 @@ final class ActivityManager {
     func saveBottle(amountOz: Double, source: BottleSource = .breastMilk, at time: Date = Date()) {
         guard let baby else { return }
         let event = FeedEvent(
+            id: UUID(),
+            babyID: baby.id,
             startTime: time,
             endTime: time,
-            kind: .bottle,
-            source: source,
+            feedKind: .bottle,
+            bottleSource: source,
             amountOz: amountOz,
-            baby: baby
+            caregiverName: DeviceIdentity.caregiverName,
+            deviceID: DeviceIdentity.deviceID
         )
-        modelContext.insert(event)
-        save()
+        try? database.write { db in
+            try FeedEvent.insert { event }.execute(db)
+        }
         refresh()
     }
 
@@ -305,31 +341,48 @@ final class ActivityManager {
 
     func startSleep(at startTime: Date? = nil) {
         guard let baby else { return }
-        let event = SleepEvent(startTime: startTime ?? Date(), baby: baby)
-        modelContext.insert(event)
-        save()
+        let event = SleepEvent(
+            id: UUID(),
+            babyID: baby.id,
+            startTime: startTime ?? Date(),
+            caregiverName: DeviceIdentity.caregiverName,
+            deviceID: DeviceIdentity.deviceID
+        )
+        try? database.write { db in
+            try SleepEvent.insert { event }.execute(db)
+        }
         activeSleepEvent = event
         refresh()
     }
 
     func resumeSleep() {
         guard let event = activeSleepEvent else { return }
-        event.endTime = nil
-        save()
+        try? database.write { db in
+            try SleepEvent.find(event.id)
+                .update { $0.endTime = #bind(nil as Date?) }
+                .execute(db)
+        }
+        activeSleepEvent?.endTime = nil
         refresh()
     }
 
     func stopSleep() {
         guard let event = activeSleepEvent, event.isActive else { return }
-        event.endTime = Date()
-        save()
+        let now = Date()
+        try? database.write { db in
+            try SleepEvent.find(event.id)
+                .update { $0.endTime = #bind(now) }
+                .execute(db)
+        }
+        activeSleepEvent?.endTime = now
         refresh()
     }
 
     func resetSleep() {
         if let event = activeSleepEvent {
-            modelContext.delete(event)
-            save()
+            try? database.write { db in
+                try SleepEvent.find(event.id).delete().execute(db)
+            }
         }
         activeSleepEvent = nil
         refresh()
@@ -338,18 +391,30 @@ final class ActivityManager {
     func saveSleep() {
         guard let event = activeSleepEvent else { return }
         if event.isActive {
-            event.endTime = Date()
+            let now = Date()
+            try? database.write { db in
+                try SleepEvent.find(event.id)
+                    .update { $0.endTime = #bind(now) }
+                    .execute(db)
+            }
         }
-        save()
         activeSleepEvent = nil
         refresh()
     }
 
     func saveSleepManual(startTime: Date, endTime: Date) {
         guard let baby else { return }
-        let event = SleepEvent(startTime: startTime, endTime: endTime, baby: baby)
-        modelContext.insert(event)
-        save()
+        let event = SleepEvent(
+            id: UUID(),
+            babyID: baby.id,
+            startTime: startTime,
+            endTime: endTime,
+            caregiverName: DeviceIdentity.caregiverName,
+            deviceID: DeviceIdentity.deviceID
+        )
+        try? database.write { db in
+            try SleepEvent.insert { event }.execute(db)
+        }
         activeSleepEvent = nil
         refresh()
     }
@@ -358,12 +423,22 @@ final class ActivityManager {
 
     func allFeedEvents() -> [FeedEvent] {
         guard let baby else { return [] }
-        return (baby.feedEvents ?? []).sorted { $0.startTime > $1.startTime }
+        return (try? database.read { db in
+            try FeedEvent
+                .where { $0.babyID.eq(#bind(baby.id)) }
+                .order { $0.startTime.desc() }
+                .fetchAll(db)
+        }) ?? []
     }
 
     func allSleepEvents() -> [SleepEvent] {
         guard let baby else { return [] }
-        return (baby.sleepEvents ?? []).sorted { $0.startTime > $1.startTime }
+        return (try? database.read { db in
+            try SleepEvent
+                .where { $0.babyID.eq(#bind(baby.id)) }
+                .order { $0.startTime.desc() }
+                .fetchAll(db)
+        }) ?? []
     }
 
     // MARK: - Event Queries (day-scoped)
@@ -373,9 +448,12 @@ final class ActivityManager {
         let calendar = Calendar.current
         let start = calendar.startOfDay(for: date)
         guard let end = calendar.date(byAdding: .day, value: 1, to: start) else { return [] }
-        return (baby.feedEvents ?? [])
-            .filter { $0.startTime >= start && $0.startTime < end }
-            .sorted { $0.startTime < $1.startTime }
+        return (try? database.read { db in
+            try FeedEvent
+                .where { $0.babyID.eq(#bind(baby.id)) && $0.startTime >= #bind(start) && $0.startTime < #bind(end) }
+                .order { $0.startTime.asc() }
+                .fetchAll(db)
+        }) ?? []
     }
 
     func sleepEvents(for date: Date) -> [SleepEvent] {
@@ -383,15 +461,22 @@ final class ActivityManager {
         let calendar = Calendar.current
         let start = calendar.startOfDay(for: date)
         guard let end = calendar.date(byAdding: .day, value: 1, to: start) else { return [] }
-        return (baby.sleepEvents ?? [])
-            .filter { !$0.isNightSleep && $0.startTime >= start && $0.startTime < end }
-            .sorted { $0.startTime < $1.startTime }
+        return (try? database.read { db in
+            try SleepEvent
+                .where { $0.babyID.eq(#bind(baby.id)) && $0.isNightSleep.eq(false) && $0.startTime >= #bind(start) && $0.startTime < #bind(end) }
+                .order { $0.startTime.asc() }
+                .fetchAll(db)
+        }) ?? []
     }
 
     func wakeEvent(for date: Date) -> WakeEvent? {
         guard let baby else { return nil }
         let startOfDay = Calendar.current.startOfDay(for: date)
-        return (baby.wakeEvents ?? []).first { $0.date == startOfDay }
+        return try? database.read { db in
+            try WakeEvent
+                .where { $0.babyID.eq(#bind(baby.id)) && $0.date.eq(#bind(startOfDay)) }
+                .fetchOne(db)
+        }
     }
 
     func nightSleep(for date: Date) -> SleepEvent? {
@@ -399,18 +484,31 @@ final class ActivityManager {
         let calendar = Calendar.current
         let start = calendar.startOfDay(for: date)
         guard let end = calendar.date(byAdding: .day, value: 1, to: start) else { return nil }
-        return (baby.sleepEvents ?? [])
-            .first { $0.isNightSleep && $0.startTime >= start && $0.startTime < end }
+        return try? database.read { db in
+            try SleepEvent
+                .where { $0.babyID.eq(#bind(baby.id)) && $0.isNightSleep.eq(true) && $0.startTime >= #bind(start) && $0.startTime < #bind(end) }
+                .fetchOne(db)
+        }
     }
 
     func daysWithEvents() -> [Date] {
         guard let baby else { return [] }
         let calendar = Calendar.current
+        let allFeeds = (try? database.read { db in
+            try FeedEvent
+                .where { $0.babyID.eq(#bind(baby.id)) }
+                .fetchAll(db)
+        }) ?? []
+        let allSleeps = (try? database.read { db in
+            try SleepEvent
+                .where { $0.babyID.eq(#bind(baby.id)) }
+                .fetchAll(db)
+        }) ?? []
         var days = Set<Date>()
-        for event in baby.feedEvents ?? [] {
+        for event in allFeeds {
             days.insert(calendar.startOfDay(for: event.startTime))
         }
-        for event in baby.sleepEvents ?? [] {
+        for event in allSleeps {
             days.insert(calendar.startOfDay(for: event.startTime))
         }
         return days.sorted(by: >)
@@ -419,45 +517,62 @@ final class ActivityManager {
     // MARK: - Delete Events
 
     func deleteFeedEvent(_ event: FeedEvent) {
-        if activeNursingEvent === event {
+        if activeNursingEvent?.id == event.id {
             activeNursingEvent = nil
         }
-        modelContext.delete(event)
-        save()
+        try? database.write { db in
+            try FeedEvent.find(event.id).delete().execute(db)
+        }
         refresh()
     }
 
     func deleteSleepEvent(_ event: SleepEvent) {
-        if activeSleepEvent === event {
+        if activeSleepEvent?.id == event.id {
             activeSleepEvent = nil
         }
-        modelContext.delete(event)
-        save()
+        try? database.write { db in
+            try SleepEvent.find(event.id).delete().execute(db)
+        }
         refresh()
     }
 
     // MARK: - Update Events
 
     func updateFeedEvent(_ event: FeedEvent, amountOz: Double, at time: Date) {
-        event.startTime = time
-        event.endTime = time
-        event.amountOz = amountOz
-        save()
+        try? database.write { db in
+            try FeedEvent.find(event.id)
+                .update {
+                    $0.startTime = #bind(time)
+                    $0.endTime = #bind(time)
+                    $0.amountOz = #bind(amountOz)
+                }
+                .execute(db)
+        }
         refresh()
     }
 
     func updateNursingEvent(_ event: FeedEvent, startTime: Date, endTime: Date, side: NursingSide) {
-        event.startTime = startTime
-        event.endTime = endTime
-        event.side = side
-        save()
+        try? database.write { db in
+            try FeedEvent.find(event.id)
+                .update {
+                    $0.startTime = #bind(startTime)
+                    $0.endTime = #bind(endTime)
+                    $0.nursingSide = #bind(side)
+                }
+                .execute(db)
+        }
         refresh()
     }
 
     func updateSleepEvent(_ event: SleepEvent, startTime: Date, endTime: Date) {
-        event.startTime = startTime
-        event.endTime = endTime
-        save()
+        try? database.write { db in
+            try SleepEvent.find(event.id)
+                .update {
+                    $0.startTime = #bind(startTime)
+                    $0.endTime = #bind(endTime)
+                }
+                .execute(db)
+        }
         refresh()
     }
 
@@ -465,57 +580,71 @@ final class ActivityManager {
 
     func setWakeTime(_ time: Date) {
         guard let baby else { return }
-        let startOfDay = Calendar.current.startOfDay(for: Date())
+        let today = Calendar.current.startOfDay(for: time)
 
-        if let existing = todayWakeEvent {
-            // Upsert: update existing wake event for today
-            existing.time = time
-        } else {
-            // Create new wake event
-            let event = WakeEvent(date: startOfDay, time: time, baby: baby)
-            modelContext.insert(event)
+        try? database.write { db in
+            let existing = try WakeEvent
+                .where { $0.babyID.eq(#bind(baby.id)) && $0.date.eq(#bind(today)) }
+                .fetchOne(db)
+
+            if let existing {
+                try WakeEvent.find(existing.id)
+                    .update { $0.time = #bind(time) }
+                    .execute(db)
+            } else {
+                try WakeEvent.insert {
+                    WakeEvent.create(babyID: baby.id, time: time)
+                }.execute(db)
+            }
         }
-        save()
         refresh()
     }
 
-    var hasWakeTime: Bool {
-        todayWakeEvent != nil
-    }
+    var hasWakeTime: Bool { todayWakeEvent != nil }
 
-    var wakeTimeFormatted: String {
-        todayWakeEvent?.time.shortTime ?? "--"
-    }
+    var wakeTimeFormatted: String { todayWakeEvent?.time.shortTime ?? "--" }
 
     // MARK: - Bedtime Actions
 
     func logBedtime(_ time: Date) {
         guard let baby else { return }
-        let event = SleepEvent(startTime: time, isNightSleep: true, baby: baby)
-        modelContext.insert(event)
-        save()
+        let event = SleepEvent(
+            id: UUID(),
+            babyID: baby.id,
+            startTime: time,
+            isNightSleep: true,
+            caregiverName: DeviceIdentity.caregiverName,
+            deviceID: DeviceIdentity.deviceID
+        )
+        try? database.write { db in
+            try SleepEvent.insert { event }.execute(db)
+        }
         refresh()
     }
 
-    /// End the active night sleep. If the wake time is 5 AM or later,
-    /// also set it as the morning wake time for the day.
     func logWakeUp(at time: Date) {
         guard let nightSleep = activeNightSleep else { return }
-        nightSleep.endTime = time
+        try? database.write { db in
+            try SleepEvent.find(nightSleep.id)
+                .update { $0.endTime = #bind(time) }
+                .execute(db)
+        }
 
         let hour = Calendar.current.component(.hour, from: time)
         if hour >= 5 {
             setWakeTime(time)
         }
 
-        save()
         refresh()
     }
 
     func updateBedtime(_ time: Date) {
         guard let nightSleep = activeNightSleep ?? todayNightSleep else { return }
-        nightSleep.startTime = time
-        save()
+        try? database.write { db in
+            try SleepEvent.find(nightSleep.id)
+                .update { $0.startTime = #bind(time) }
+                .execute(db)
+        }
         refresh()
     }
 
@@ -523,26 +652,26 @@ final class ActivityManager {
         todaySleeps.first { $0.isNightSleep }
     }
 
-    /// Finds any active night sleep across all days (not just today).
-    /// Handles the cross-day case where bedtime was logged yesterday but baby is still sleeping.
     var activeNightSleep: SleepEvent? {
         guard let baby else { return nil }
-        let allSleeps = baby.sleepEvents ?? []
-        return allSleeps.first { $0.isNightSleep && $0.isActive }
+        return try? database.read { db in
+            try SleepEvent
+                .where { $0.babyID.eq(#bind(baby.id)) && $0.isNightSleep.eq(true) && $0.endTime.is(nil) }
+                .fetchOne(db)
+        }
     }
 
-    /// Most recently completed night sleep that ended today.
-    /// Provides wake reference after overnight wakes (before 5 AM).
     private var lastCompletedNightSleepEndedToday: SleepEvent? {
         guard let baby else { return nil }
         let startOfDay = Calendar.current.startOfDay(for: Date())
-        let allSleeps = baby.sleepEvents ?? []
-        return allSleeps
-            .filter { $0.isNightSleep && !$0.isActive && ($0.endTime ?? .distantPast) >= startOfDay }
-            .max(by: { ($0.endTime ?? .distantPast) < ($1.endTime ?? .distantPast) })
+        return try? database.read { db in
+            try SleepEvent
+                .where { $0.babyID.eq(#bind(baby.id)) && $0.isNightSleep.eq(true) && $0.endTime.isNot(nil) && $0.endTime >= #bind(startOfDay) }
+                .order { $0.endTime.desc() }
+                .fetchOne(db)
+        }
     }
 
-    /// True when baby woke from night sleep before 5 AM and hasn't gone back to bed.
     var isOvernightWake: Bool {
         guard activeNightSleep == nil else { return false }
         guard !hasWakeTime else { return false }
@@ -555,15 +684,7 @@ final class ActivityManager {
         (activeNightSleep ?? todayNightSleep)?.startTime.shortTime
     }
 
-    var isAsleepForNight: Bool {
-        activeNightSleep != nil
-    }
-
-    // MARK: - Persistence
-
-    private func save() {
-        try? modelContext.save()
-    }
+    var isAsleepForNight: Bool { activeNightSleep != nil }
 
     // MARK: - Nursing State (API compatibility with sheet views)
 
@@ -571,9 +692,7 @@ final class ActivityManager {
         activeNursingEvent != nil && activeNursingEvent?.endTime == nil
     }
 
-    var hasNursingSession: Bool {
-        activeNursingEvent != nil
-    }
+    var hasNursingSession: Bool { activeNursingEvent != nil }
 
     var nursingStartTime: Date? {
         get { activeNursingEvent?.startTime }
@@ -591,9 +710,7 @@ final class ActivityManager {
         activeSleepEvent != nil && activeSleepEvent?.endTime == nil
     }
 
-    var hasSleepSession: Bool {
-        activeSleepEvent != nil
-    }
+    var hasSleepSession: Bool { activeSleepEvent != nil }
 
     var sleepStartTime: Date? {
         get { activeSleepEvent?.startTime }
@@ -609,16 +726,14 @@ final class ActivityManager {
 
     func nursingTimerString(at date: Date = Date()) -> String {
         guard let start = nursingStartTime else { return "00:00" }
-
         let reference: Date
         if isNursingActive {
-            reference = date              // live ticking
+            reference = date
         } else if let end = nursingEndTime {
-            reference = end               // static stopped duration
+            reference = end
         } else {
-            return "00:00"                // no valid state
+            return "00:00"
         }
-
         let elapsed = max(0, reference.timeIntervalSince(start))
         let minutes = Int(elapsed) / 60
         let seconds = Int(elapsed) % 60
@@ -627,7 +742,6 @@ final class ActivityManager {
 
     func sleepTimerString(at date: Date = Date()) -> String {
         guard let start = sleepStartTime else { return "00:00" }
-
         let reference: Date
         if isSleepActive {
             reference = date
@@ -636,7 +750,6 @@ final class ActivityManager {
         } else {
             return "00:00"
         }
-
         let elapsed = max(0, reference.timeIntervalSince(start))
         let minutes = Int(elapsed) / 60
         let seconds = Int(elapsed) % 60
@@ -645,7 +758,6 @@ final class ActivityManager {
 
     func nursingTimerMinutesString(at date: Date = Date()) -> String {
         guard let start = nursingStartTime else { return "" }
-
         let reference: Date
         if isNursingActive {
             reference = date
@@ -654,7 +766,6 @@ final class ActivityManager {
         } else {
             return ""
         }
-
         let elapsed = max(0, reference.timeIntervalSince(start))
         let totalMinutes = Int(elapsed) / 60
         if totalMinutes == 0 { return "" }
@@ -668,7 +779,6 @@ final class ActivityManager {
 
     func sleepTimerMinutesString(at date: Date = Date()) -> String {
         guard let start = sleepStartTime else { return "" }
-
         let reference: Date
         if isSleepActive {
             reference = date
@@ -677,7 +787,6 @@ final class ActivityManager {
         } else {
             return ""
         }
-
         let elapsed = max(0, reference.timeIntervalSince(start))
         let totalMinutes = Int(elapsed) / 60
         if totalMinutes == 0 { return "" }
@@ -709,21 +818,12 @@ final class ActivityManager {
         return formatter.string(from: Date())
     }
 
-    var ageDisplayString: String {
-        baby?.ageDescription ?? ""
-    }
+    var ageDisplayString: String { baby?.ageDescription ?? "" }
+    var babyName: String { baby?.name ?? "" }
 
-    var babyName: String {
-        baby?.name ?? ""
-    }
+    var bedtimeFormatted: String? { baby?.bedtimeToday().shortTime }
 
-    var bedtimeFormatted: String? {
-        baby?.bedtimeToday().shortTime
-    }
-
-    var dreamFeedEnabled: Bool {
-        baby?.dreamFeedEnabled ?? false
-    }
+    var dreamFeedEnabled: Bool { baby?.dreamFeedEnabled ?? false }
 
     var dreamFeedTimeFormatted: String? {
         guard let baby, baby.dreamFeedEnabled else { return nil }
@@ -733,13 +833,31 @@ final class ActivityManager {
         return Calendar.current.date(from: components)?.shortTime
     }
 
-    var babyPhotoData: Data? {
-        baby?.photoData
+    var babyPhotoData: Data? { baby?.photoData }
+
+    func updateBaby(_ changes: (inout Baby) -> Void) {
+        guard var baby else { return }
+        changes(&baby)
+        try? database.write { db in
+            try Baby.find(baby.id)
+                .update {
+                    $0.name = #bind(baby.name)
+                    $0.birthdate = #bind(baby.birthdate)
+                    $0.bedtimeHour = #bind(baby.bedtimeHour)
+                    $0.bedtimeMinute = #bind(baby.bedtimeMinute)
+                    $0.dreamFeedEnabled = #bind(baby.dreamFeedEnabled)
+                    $0.dreamFeedHour = #bind(baby.dreamFeedHour)
+                    $0.dreamFeedMinute = #bind(baby.dreamFeedMinute)
+                    $0.customFeedIntervalMinutes = #bind(baby.customFeedIntervalMinutes)
+                    $0.photoData = #bind(baby.photoData)
+                }
+                .execute(db)
+        }
+        self.baby = baby
     }
 
     func setBabyPhoto(_ data: Data?) {
-        baby?.photoData = data
-        save()
+        updateBaby { $0.photoData = data }
     }
 
     var feedCount: Int { todayFeeds.count }
@@ -751,23 +869,13 @@ final class ActivityManager {
         return todayFeeds.reduce(0) { $0 + $1.estimatedOz(nursingOzPerMinute: table.nursingOzPerMinute(at: $1.startTime, ageInDays: baby.ageInDays)) }
     }
 
-    var totalSleepMinutes: Int {
-        todaySleeps.compactMap(\.durationMinutes).reduce(0, +)
-    }
-
-    var longestSleepMinutes: Int {
-        todaySleeps.compactMap(\.durationMinutes).max() ?? 0
-    }
+    var totalSleepMinutes: Int { todaySleeps.compactMap(\.durationMinutes).reduce(0, +) }
+    var longestSleepMinutes: Int { todaySleeps.compactMap(\.durationMinutes).max() ?? 0 }
 
     // MARK: - Feed Recommendation Helpers
 
-    var lastFeed: FeedEvent? {
-        todayFeeds.last
-    }
-
-    var lastSleep: SleepEvent? {
-        todaySleeps.filter({ $0.endTime != nil }).last
-    }
+    var lastFeed: FeedEvent? { todayFeeds.last }
+    var lastSleep: SleepEvent? { todaySleeps.filter({ $0.endTime != nil }).last }
 
     var minutesSinceLastFeed: Int? {
         guard let feed = lastFeed else { return nil }
@@ -786,9 +894,7 @@ final class ActivityManager {
         return (range.lowerBound + range.upperBound) / 2
     }
 
-    var remainingFeeds: Int {
-        max(1, totalDailyFeeds - feedCount)
-    }
+    var remainingFeeds: Int { max(1, totalDailyFeeds - feedCount) }
 
     var remainingOz: Double {
         guard let baby else { return 0 }
@@ -806,16 +912,11 @@ final class ActivityManager {
         guard let feed = lastFeed, let baby else { return "--" }
         let intervalMinutes = Double(baby.effectiveFeedIntervalMinutes)
         let nextTime = feed.startTime.addingTimeInterval(intervalMinutes * 60)
-        if nextTime <= Date() {
-            return "Now"
-        }
+        if nextTime <= Date() { return "Now" }
         return nextTime.shortTime
     }
 
-    var lastFeedOzFormatted: String {
-        guard let feed = lastFeed else { return "--" }
-        return feed.shortDescription
-    }
+    var lastFeedOzFormatted: String { lastFeed?.shortDescription ?? "--" }
 
     var timeSinceLastFeedDuration: String {
         guard let mins = minutesSinceLastFeed else { return "--" }
@@ -831,13 +932,8 @@ final class ActivityManager {
         return hours > 0 ? "\(hours)h \(minutes)m" : "\(minutes)m"
     }
 
-    var lastSleepTimeFormatted: String {
-        lastSleep?.endTime?.shortTime ?? "--"
-    }
-
-    var lastSleepDurationFormatted: String {
-        lastSleep?.durationDescription ?? "--"
-    }
+    var lastSleepTimeFormatted: String { lastSleep?.endTime?.shortTime ?? "--" }
+    var lastSleepDurationFormatted: String { lastSleep?.durationDescription ?? "--" }
 
     var totalSleepFormatted: String {
         let hours = totalSleepMinutes / 60
@@ -853,9 +949,7 @@ final class ActivityManager {
         return hours > 0 ? "\(hours)h \(remaining)m" : "\(mins)m"
     }
 
-    var totalOzFormatted: String {
-        "\(Int(totalIntakeOz)) oz"
-    }
+    var totalOzFormatted: String { "\(Int(totalIntakeOz)) oz" }
 
     var averageOzFormatted: String {
         guard feedCount > 0 else { return "--" }

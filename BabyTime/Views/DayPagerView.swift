@@ -6,8 +6,8 @@
 //  Edit sheets and delete confirmation attached here.
 //
 
+import Dependencies
 import SwiftUI
-import SwiftData
 
 struct DayPagerView: View {
     @Environment(ActivityManager.self) private var activityManager
@@ -285,16 +285,18 @@ private struct LogRow: View {
 // MARK: - Preview
 
 #Preview("Day Pager") {
-    let container = try! ModelContainer(
-        for: Baby.self, FeedEvent.self, SleepEvent.self, WakeEvent.self,
-        configurations: ModelConfiguration(isStoredInMemoryOnly: true)
-    )
-    let manager = ActivityManager(modelContext: container.mainContext)
-    let baby = manager.addBaby(
-        name: "Kaia",
-        birthdate: Calendar.current.date(byAdding: .day, value: -100, to: Date())!
-    )
-    manager.selectBaby(baby)
+    let manager = withDependencies {
+        try! $0.bootstrapTestDatabase()
+    } operation: {
+        @Dependency(\.defaultDatabase) var database
+        let m = ActivityManager(database: database)
+        let baby = m.addBaby(
+            name: "Kaia",
+            birthdate: Calendar.current.date(byAdding: .day, value: -100, to: Date())!
+        )
+        m.selectBaby(baby)
+        return m
+    }
 
     let cal = Calendar.current
     let today = Date()

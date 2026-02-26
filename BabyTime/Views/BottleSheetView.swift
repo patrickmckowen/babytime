@@ -5,8 +5,8 @@
 //  Bottle feed log sheet: slider for ounces, save/cancel.
 //
 
+import Dependencies
 import SwiftUI
-import SwiftData
 
 struct BottleSheetView: View {
     @Environment(ActivityManager.self) private var activityManager
@@ -154,10 +154,12 @@ struct BottleSheetView: View {
 }
 
 #Preview {
-    let container = try! ModelContainer(
-        for: Baby.self, FeedEvent.self, SleepEvent.self, WakeEvent.self,
-        configurations: ModelConfiguration(isStoredInMemoryOnly: true)
-    )
+    let manager = withDependencies {
+        try! $0.bootstrapTestDatabase()
+    } operation: {
+        @Dependency(\.defaultDatabase) var database
+        return ActivityManager(database: database)
+    }
     BottleSheetView()
-        .environment(ActivityManager(modelContext: container.mainContext))
+        .environment(manager)
 }

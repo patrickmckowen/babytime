@@ -26,17 +26,16 @@ private func makeBaby(
     let birthdate = Calendar.current.date(
         byAdding: .day, value: -ageDays, to: referenceDate
     )!
-    let baby = Baby(
+    return Baby(
         name: "Test",
         birthdate: birthdate,
         bedtimeHour: bedtimeHour,
         bedtimeMinute: bedtimeMinute,
         dreamFeedEnabled: dreamFeedEnabled,
         dreamFeedHour: dreamFeedHour,
-        dreamFeedMinute: dreamFeedMinute
+        dreamFeedMinute: dreamFeedMinute,
+        customFeedIntervalMinutes: customFeedIntervalMinutes
     )
-    baby.customFeedIntervalMinutes = customFeedIntervalMinutes
-    return baby
 }
 
 /// Creates a completed feed event
@@ -370,6 +369,79 @@ struct NotificationSchedulerTests {
 
         #expect(!ids.contains("ww-approaching"), "Should not suggest a nap after nap cutoff")
         #expect(!ids.contains("ww-exceeded"), "Should not report wake window ended after nap cutoff")
+    }
+
+    @Test("Sleeping suppresses feed triggers")
+    func sleepingSuppressesFeedTriggers() {
+        let baby = makeBaby(ageDays: 90, referenceDate: now)
+        let feed = makeFeed(minutesAgo: 60, referenceDate: now)
+        let activeSleep = makeActiveSleep(startedMinutesAgo: 20, referenceDate: now)
+
+        let snapshot = DayEngine.snapshot(
+            baby: baby, feeds: [feed], sleeps: [activeSleep], now: now
+        )
+
+        // Verify baby is sleeping
+        switch snapshot.dayState {
+        case .sleepingNoPressure, .sleepingApproachingCutoff, .sleepingMustEnd:
+            break
+        default:
+            Issue.record("Expected sleeping state, got \(snapshot.dayState)")
+            return
+        }
+
+        let triggers = NotificationScheduler.triggers(from: snapshot, baby: baby, now: now)
+        let ids = triggerIDs(triggers)
+
+        #expect(!ids.contains("feed-approaching"), "Should not schedule feed-approaching while sleeping")
+        #expect(!ids.contains("feed-ready"), "Should not schedule feed-ready while sleeping")
+    }
+
+    @Test("Sleeping suppresses bedtime-approaching")
+    func sleepingSuppressesBedtimeApproaching() {
+        let baby = makeBaby(ageDays: 90, bedtimeHour: 19, referenceDate: now)
+        let feed = makeFeed(minutesAgo: 60, referenceDate: now)
+        let activeSleep = makeActiveSleep(startedMinutesAgo: 20, referenceDate: now)
+
+        let snapshot = DayEngine.snapshot(
+            baby: baby, feeds: [feed], sleeps: [activeSleep], now: now
+        )
+
+        // Verify baby is sleeping
+        switch snapshot.dayState {
+        case .sleepingNoPressure, .sleepingApproachingCutoff, .sleepingMustEnd:
+            break
+        default:
+            Issue.record("Expected sleeping state, got \(snapshot.dayState)")
+            return
+        }
+
+        let triggers = NotificationScheduler.triggers(from: snapshot, baby: baby, now: now)
+        let ids = triggerIDs(triggers)
+
+        #expect(!ids.contains("bedtime-approaching"), "Should not schedule bedtime-approaching while sleeping")
+    }
+
+    @Test("No feeds logged uses wakeReference for feed timing")
+    func noFeedsUsesWakeReference() {
+        // Baby woke from nap 30 min ago, no feeds logged today
+        let baby = makeBaby(ageDays: 90, referenceDate: now)
+        let sleep = makeSleep(startedMinutesAgo: 60, durationMinutes: 30, referenceDate: now)
+
+        let snapshot = DayEngine.snapshot(
+            baby: baby, feeds: [], sleeps: [sleep], now: now
+        )
+
+        // Verify wakeReference is set and lastFeedReference is nil
+        #expect(snapshot.wakeReference != nil, "wakeReference should be set after nap")
+        #expect(snapshot.lastFeedReference == nil, "lastFeedReference should be nil with no feeds")
+
+        let triggers = NotificationScheduler.triggers(from: snapshot, baby: baby, now: now)
+        let ids = triggerIDs(triggers)
+
+        // Feed triggers should fire based on wakeReference
+        #expect(ids.contains("feed-approaching"), "Should schedule feed-approaching from wakeReference")
+        #expect(ids.contains("feed-ready"), "Should schedule feed-ready from wakeReference")
     }
 
     @Test("Trigger fire dates are all in the future")

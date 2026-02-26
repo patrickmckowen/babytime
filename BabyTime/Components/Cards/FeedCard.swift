@@ -5,8 +5,8 @@
 //  Feed card: shows next-feed recommendation or active nursing timer.
 //
 
+import Dependencies
 import SwiftUI
-import SwiftData
 
 struct FeedCard: View {
     let mode: Mode
@@ -233,14 +233,16 @@ struct FeedCard: View {
 
 #Preview("Nursing Active") {
     @Previewable @Namespace var ns
-    let container = try! ModelContainer(
-        for: Baby.self, FeedEvent.self, SleepEvent.self, WakeEvent.self,
-        configurations: ModelConfiguration(isStoredInMemoryOnly: true)
-    )
+    let manager = withDependencies {
+        try! $0.bootstrapTestDatabase()
+    } operation: {
+        @Dependency(\.defaultDatabase) var database
+        return ActivityManager(database: database)
+    }
     ZStack {
         Color.btBackground.ignoresSafeArea()
         FeedCard(mode: .nursingActive, sheetTransition: ns)
             .padding(.horizontal, BTSpacing.pageMargin)
     }
-    .environment(ActivityManager(modelContext: container.mainContext))
+    .environment(manager)
 }

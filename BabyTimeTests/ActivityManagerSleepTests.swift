@@ -5,9 +5,10 @@
 //  Tests for ActivityManager sleep state machine transitions.
 //
 
+import Dependencies
+import SQLiteData
 import Testing
 import Foundation
-import SwiftData
 @testable import BabyTime
 
 // MARK: - Sleep State Machine Tests
@@ -17,13 +18,11 @@ import SwiftData
 struct SleepStateMachineTests {
 
     private func withManager(_ body: (ActivityManager) -> Void) {
-        let config = ModelConfiguration("test-\(UUID())", isStoredInMemoryOnly: true, cloudKitDatabase: .none)
-        let container = try! ModelContainer(
-            for: Baby.self, FeedEvent.self, SleepEvent.self, WakeEvent.self,
-            configurations: config
-        )
-        withExtendedLifetime(container) {
-            let manager = ActivityManager(modelContext: container.mainContext)
+        withDependencies {
+            try! $0.bootstrapTestDatabase()
+        } operation: {
+            @Dependency(\.defaultDatabase) var database
+            let manager = ActivityManager(database: database)
             let baby = manager.addBaby(name: "Test", birthdate: Date())
             manager.selectBaby(baby)
             body(manager)
@@ -166,13 +165,11 @@ struct SleepStateMachineTests {
 struct OvernightSleepFlowTests {
 
     private func withManager(_ body: (ActivityManager) -> Void) {
-        let config = ModelConfiguration("test-\(UUID())", isStoredInMemoryOnly: true, cloudKitDatabase: .none)
-        let container = try! ModelContainer(
-            for: Baby.self, FeedEvent.self, SleepEvent.self, WakeEvent.self,
-            configurations: config
-        )
-        withExtendedLifetime(container) {
-            let manager = ActivityManager(modelContext: container.mainContext)
+        withDependencies {
+            try! $0.bootstrapTestDatabase()
+        } operation: {
+            @Dependency(\.defaultDatabase) var database
+            let manager = ActivityManager(database: database)
             let baby = manager.addBaby(name: "Test", birthdate: Calendar.current.date(byAdding: .day, value: -90, to: Date())!)
             manager.selectBaby(baby)
             body(manager)

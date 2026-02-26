@@ -20,10 +20,11 @@ sharing between different iCloud accounts.
 
 ## Migration Approach
 
-The migration from SwiftData to SQLiteData is phased. During migration,
-both the old SwiftData models and new SQLiteData models coexist. The new
-models use a `Sync` prefix (e.g. `SyncBaby`) until Phase 2 when the old
-models are removed and the new models are renamed.
+The migration from SwiftData to SQLiteData is phased. Phases 1-2 are
+complete: the old SwiftData `@Model` classes have been removed and the
+`@Table` structs are now the canonical types (`Baby`, `FeedEvent`,
+`SleepEvent`, `WakeEvent`). The SQLite tables retain the `sync` prefix
+(e.g. `syncBabies`) for future CloudKit compatibility.
 
 ## Schema
 
@@ -33,7 +34,7 @@ are modeled with foreign key columns, not object references.
 ### Tables
 
 ```
-SyncBaby (→ Baby after Phase 2)
+Baby  (table: syncBabies)
 ├── id: UUID (primary key)
 ├── stableID: String (for @AppStorage baby selection)
 ├── name: String
@@ -47,9 +48,9 @@ SyncBaby (→ Baby after Phase 2)
 ├── photoData: Data? (@Column(.externalData) → CKAsset)
 └── createdAt: Date
 
-SyncFeedEvent (→ FeedEvent after Phase 2)
+FeedEvent  (table: syncFeedEvents)
 ├── id: UUID (primary key)
-├── babyID: UUID (foreign key → SyncBaby.id)
+├── babyID: UUID (foreign key → Baby.id)
 ├── startTime: Date
 ├── endTime: Date?
 ├── feedKind: FeedKind (.bottle | .nursing)
@@ -59,18 +60,18 @@ SyncFeedEvent (→ FeedEvent after Phase 2)
 ├── caregiverName: String
 └── deviceID: String
 
-SyncSleepEvent (→ SleepEvent after Phase 2)
+SleepEvent  (table: syncSleepEvents)
 ├── id: UUID (primary key)
-├── babyID: UUID (foreign key → SyncBaby.id)
+├── babyID: UUID (foreign key → Baby.id)
 ├── startTime: Date
 ├── endTime: Date?
 ├── isNightSleep: Bool
 ├── caregiverName: String
 └── deviceID: String
 
-SyncWakeEvent (→ WakeEvent after Phase 2)
+WakeEvent  (table: syncWakeEvents)
 ├── id: UUID (primary key)
-├── babyID: UUID (foreign key → SyncBaby.id)
+├── babyID: UUID (foreign key → Baby.id)
 ├── date: Date (start of day — one per baby per day)
 ├── time: Date (actual wake time)
 ├── caregiverName: String
@@ -80,9 +81,9 @@ SyncWakeEvent (→ WakeEvent after Phase 2)
 ### Relationships
 
 ```
-SyncBaby 1──* SyncFeedEvent   (via babyID, cascade delete)
-SyncBaby 1──* SyncSleepEvent  (via babyID, cascade delete)
-SyncBaby 1──* SyncWakeEvent   (via babyID, cascade delete)
+Baby 1──* FeedEvent   (via babyID, cascade delete)
+Baby 1──* SleepEvent  (via babyID, cascade delete)
+Baby 1──* WakeEvent   (via babyID, cascade delete)
 ```
 
 ### Enums
@@ -162,28 +163,26 @@ Last-write-wins is acceptable (wake time is the same either way).
 
 | Phase | Status | Notes |
 |---|---|---|
-| 1. Foundation (package, models, DB setup) | **Complete** | 108 tests passing |
-| 2. ActivityManager rewrite | Not started | Depends on Phase 1 |
-| 3. View updates | Not started | Depends on Phase 2 |
-| 4. Test migration | Not started | Parallel with Phase 3 |
+| 1. Foundation (package, models, DB setup) | **Complete** | SQLiteData + StructuredQueries |
+| 2. ActivityManager rewrite | **Complete** | ModelContext → DatabaseWriter, all queries use StructuredQueries |
+| 3. View updates | **Complete** | SwiftData imports removed, bindings use ActivityManager |
+| 4. Test migration | **Complete** | 109 tests across 22 suites passing |
 | 5. CloudKit private sync | Not started | Depends on Phases 1-4 |
 | 6. CloudKit sharing (CKShare) | Not started | Depends on Phase 5 |
 | 7. Polish (migration, cleanup, sync UI) | Not started | Depends on Phase 6 |
 
 ## Files Involved
 
-### New files (Phase 1)
-- `BabyTime/Database/SyncModels.swift` — @Table structs
-- `BabyTime/Database/AppDatabase.swift` — database setup
-- `BabyTimeTests/SyncModelTests.swift` — schema verification tests
+### Database layer
+- `BabyTime/Database/Models.swift` — `@Table` structs (Baby, FeedEvent, SleepEvent, WakeEvent)
+- `BabyTime/Database/AppDatabase.swift` — database setup + DependencyValues extensions
+- `BabyTimeTests/SyncModelTests.swift` — schema verification and CRUD tests
 
-### Files to modify (Phase 2+)
-- `BabyTime/Models/ActivityManager.swift` — ModelContext → DatabaseQueue
-- `BabyTime/BabyTimeApp.swift` — ModelContainer → prepareDependencies
-- All view files using `@Query` → `@FetchAll`
-- Model files: rename Sync-prefixed types to final names
+### Application layer
+- `BabyTime/Models/ActivityManager.swift` — all persistence via `DatabaseWriter`
+- `BabyTime/BabyTimeApp.swift` — `prepareDependencies` bootstrap
 
-### Files unchanged
+### Pure logic (no database dependency)
 - `BabyTime/Engine/DayEngine.swift` — pure functions
 - `BabyTime/Engine/AgeTable.swift` — pure data
 - `BabyTime/Models/DeviceIdentity.swift` — UserDefaults only

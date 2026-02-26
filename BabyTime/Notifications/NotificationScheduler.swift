@@ -20,7 +20,8 @@ enum NotificationScheduler {
     static func triggers(
         from snapshot: DaySnapshot,
         baby: Baby,
-        now: Date
+        now: Date,
+        idPrefix: String = ""
     ) -> [NotificationTrigger] {
         var result: [NotificationTrigger] = []
         let name = baby.name
@@ -32,7 +33,7 @@ enum NotificationScheduler {
         if case .asleepForNight = snapshot.dayState {
             if let dreamFeedTime = baby.dreamFeedToday(), dreamFeedTime > now {
                 result.append(NotificationTrigger(
-                    id: "dream-feed",
+                    id: "\(idPrefix)dream-feed",
                     fireDate: dreamFeedTime,
                     title: "Dream Feed",
                     body: "Dream feed time for \(name)"
@@ -57,10 +58,10 @@ enum NotificationScheduler {
             let approachingDate = wakeRef.addingTimeInterval(Double(ww.lowerBound) * 60)
             if approachingDate > now && approachingDate < snapshot.napCutoff {
                 result.append(NotificationTrigger(
-                    id: "ww-approaching",
+                    id: "\(idPrefix)ww-approaching",
                     fireDate: approachingDate,
                     title: "Nap Window Opening",
-                    body: "\(name) is entering the wake window — good time to wind down"
+                    body: "Start winding down — \(name) will need a nap soon"
                 ))
             }
 
@@ -68,10 +69,10 @@ enum NotificationScheduler {
             let exceededDate = wakeRef.addingTimeInterval(Double(ww.upperBound) * 60)
             if exceededDate > now && exceededDate < snapshot.napCutoff {
                 result.append(NotificationTrigger(
-                    id: "ww-exceeded",
+                    id: "\(idPrefix)ww-exceeded",
                     fireDate: exceededDate,
-                    title: "Wake Window Ended",
-                    body: "\(name) is past the wake window"
+                    title: "Nap Time",
+                    body: "\(name) is probably pretty tired"
                 ))
             }
         }
@@ -80,7 +81,7 @@ enum NotificationScheduler {
         let cutoffApproaching = snapshot.napCutoff.addingTimeInterval(-30 * 60)
         if cutoffApproaching > now && !isSleeping {
             result.append(NotificationTrigger(
-                id: "cutoff-approaching",
+                id: "\(idPrefix)cutoff-approaching",
                 fireDate: cutoffApproaching,
                 title: "Nap Cutoff Soon",
                 body: "Last chance for a nap — cutoff in 30 minutes"
@@ -90,7 +91,7 @@ enum NotificationScheduler {
         // Nap cutoff reached (only while sleeping)
         if isSleeping && snapshot.napCutoff > now {
             result.append(NotificationTrigger(
-                id: "cutoff-reached",
+                id: "\(idPrefix)cutoff-reached",
                 fireDate: snapshot.napCutoff,
                 title: "Wake \(name) Up",
                 body: "Nap cutoff reached — time to wake up for bedtime"
@@ -100,7 +101,9 @@ enum NotificationScheduler {
         // --- Feed triggers (suppress while feeding) ---
         if case .feedingNow = snapshot.feedState {
             // no feed notifications while actively feeding
-        } else if let feedRef = snapshot.lastFeedReference {
+        } else if isSleeping {
+            // no feed notifications while napping
+        } else if let feedRef = snapshot.lastFeedReference ?? snapshot.wakeReference {
             let interval = baby.customFeedIntervalMinutes > 0
                 ? baby.customFeedIntervalMinutes...baby.customFeedIntervalMinutes
                 : snapshot.ageTable.feedIntervalMinutes
@@ -110,7 +113,7 @@ enum NotificationScheduler {
             let feedApproaching = feedRef.addingTimeInterval(approachingMin * 60)
             if feedApproaching > now {
                 result.append(NotificationTrigger(
-                    id: "feed-approaching",
+                    id: "\(idPrefix)feed-approaching",
                     fireDate: feedApproaching,
                     title: "Feed Coming Up",
                     body: "Start getting ready — \(name) will want to eat soon"
@@ -121,7 +124,7 @@ enum NotificationScheduler {
             let feedReady = feedRef.addingTimeInterval(Double(interval.lowerBound) * 60)
             if feedReady > now {
                 result.append(NotificationTrigger(
-                    id: "feed-ready",
+                    id: "\(idPrefix)feed-ready",
                     fireDate: feedReady,
                     title: "Feed Time",
                     body: "Time to offer \(name) a feed"
@@ -131,9 +134,9 @@ enum NotificationScheduler {
 
         // --- Bedtime approaching (30 min before) ---
         let bedtimeApproaching = snapshot.bedtime.addingTimeInterval(-30 * 60)
-        if bedtimeApproaching > now {
+        if bedtimeApproaching > now && !isSleeping {
             result.append(NotificationTrigger(
-                id: "bedtime-approaching",
+                id: "\(idPrefix)bedtime-approaching",
                 fireDate: bedtimeApproaching,
                 title: "Bedtime Soon",
                 body: "Start winding down — bedtime in about 30 minutes"

@@ -3,7 +3,7 @@
 //  BabyTimeTests
 //
 //  Phase 1 tests: verify SQLiteData schema, CRUD operations,
-//  and foreign key relationships for the Sync-prefixed models.
+//  and foreign key relationships for the @Table models.
 //
 
 import Dependencies
@@ -64,13 +64,13 @@ struct SyncSchemaTests {
 // MARK: - CRUD Tests
 
 @Suite("SyncModels — Baby CRUD")
-struct SyncBabyCRUDTests {
+struct BabyCRUDTests {
 
     @Test("Insert and fetch a baby")
     func insertAndFetch() throws {
         try withDatabase { db in
             let babyID = UUID()
-            let baby = SyncBaby(
+            let baby = Baby(
                 id: babyID,
                 stableID: UUID().uuidString,
                 name: "Test Baby",
@@ -78,10 +78,10 @@ struct SyncBabyCRUDTests {
                 createdAt: Date()
             )
             try db.write { db in
-                try SyncBaby.insert { baby }.execute(db)
+                try Baby.insert { baby }.execute(db)
             }
             let fetched = try db.read { db in
-                try SyncBaby.fetchAll(db)
+                try Baby.fetchAll(db)
             }
             #expect(fetched.count == 1)
             #expect(fetched.first?.id == babyID)
@@ -94,7 +94,7 @@ struct SyncBabyCRUDTests {
     @Test("Update a baby")
     func update() throws {
         try withDatabase { db in
-            let baby = SyncBaby(
+            let baby = Baby(
                 id: UUID(),
                 stableID: UUID().uuidString,
                 name: "Original",
@@ -102,13 +102,13 @@ struct SyncBabyCRUDTests {
                 createdAt: Date()
             )
             try db.write { db in
-                try SyncBaby.insert { baby }.execute(db)
-                try SyncBaby.find(baby.id)
+                try Baby.insert { baby }.execute(db)
+                try Baby.find(baby.id)
                     .update { $0.name = "Updated" }
                     .execute(db)
             }
             let fetched = try db.read { db in
-                try SyncBaby.find(baby.id).fetchOne(db)
+                try Baby.find(baby.id).fetchOne(db)
             }
             #expect(fetched?.name == "Updated")
         }
@@ -117,7 +117,7 @@ struct SyncBabyCRUDTests {
     @Test("Delete a baby")
     func delete() throws {
         try withDatabase { db in
-            let baby = SyncBaby(
+            let baby = Baby(
                 id: UUID(),
                 stableID: UUID().uuidString,
                 name: "ToDelete",
@@ -125,11 +125,11 @@ struct SyncBabyCRUDTests {
                 createdAt: Date()
             )
             try db.write { db in
-                try SyncBaby.insert { baby }.execute(db)
-                try SyncBaby.find(baby.id).delete().execute(db)
+                try Baby.insert { baby }.execute(db)
+                try Baby.find(baby.id).delete().execute(db)
             }
             let count = try db.read { db in
-                try SyncBaby.fetchCount(db)
+                try Baby.fetchCount(db)
             }
             #expect(count == 0)
         }
@@ -139,13 +139,13 @@ struct SyncBabyCRUDTests {
 // MARK: - FeedEvent CRUD
 
 @Suite("SyncModels — FeedEvent CRUD")
-struct SyncFeedEventCRUDTests {
+struct FeedEventCRUDTests {
 
     @Test("Insert feed event with foreign key")
     func insertWithFK() throws {
         try withDatabase { db in
             let babyID = UUID()
-            let baby = SyncBaby(
+            let baby = Baby(
                 id: babyID,
                 stableID: UUID().uuidString,
                 name: "Test",
@@ -153,7 +153,7 @@ struct SyncFeedEventCRUDTests {
                 createdAt: Date()
             )
             let feedID = UUID()
-            let feed = SyncFeedEvent(
+            let feed = FeedEvent(
                 id: feedID,
                 babyID: babyID,
                 startTime: Date(),
@@ -163,11 +163,11 @@ struct SyncFeedEventCRUDTests {
                 deviceID: "device-1"
             )
             try db.write { db in
-                try SyncBaby.insert { baby }.execute(db)
-                try SyncFeedEvent.insert { feed }.execute(db)
+                try Baby.insert { baby }.execute(db)
+                try FeedEvent.insert { feed }.execute(db)
             }
             let fetched = try db.read { db in
-                try SyncFeedEvent.fetchAll(db)
+                try FeedEvent.fetchAll(db)
             }
             #expect(fetched.count == 1)
             #expect(fetched.first?.feedKind == .nursing)
@@ -181,14 +181,14 @@ struct SyncFeedEventCRUDTests {
     func completedFeed() throws {
         try withDatabase { db in
             let babyID = UUID()
-            let baby = SyncBaby(
+            let baby = Baby(
                 id: babyID,
                 stableID: UUID().uuidString,
                 name: "Test",
                 birthdate: Date(),
                 createdAt: Date()
             )
-            let feed = SyncFeedEvent(
+            let feed = FeedEvent(
                 id: UUID(),
                 babyID: babyID,
                 startTime: Date().addingTimeInterval(-600),
@@ -197,11 +197,11 @@ struct SyncFeedEventCRUDTests {
                 amountOz: 4.0
             )
             try db.write { db in
-                try SyncBaby.insert { baby }.execute(db)
-                try SyncFeedEvent.insert { feed }.execute(db)
+                try Baby.insert { baby }.execute(db)
+                try FeedEvent.insert { feed }.execute(db)
             }
             let fetched = try db.read { db in
-                try SyncFeedEvent.fetchAll(db)
+                try FeedEvent.fetchAll(db)
             }
             #expect(fetched.first?.isActive == false)
             #expect(fetched.first?.amountOz == 4.0)
@@ -212,20 +212,20 @@ struct SyncFeedEventCRUDTests {
 // MARK: - SleepEvent CRUD
 
 @Suite("SyncModels — SleepEvent CRUD")
-struct SyncSleepEventCRUDTests {
+struct SleepEventCRUDTests {
 
     @Test("Insert sleep event")
     func insert() throws {
         try withDatabase { db in
             let babyID = UUID()
-            let baby = SyncBaby(
+            let baby = Baby(
                 id: babyID,
                 stableID: UUID().uuidString,
                 name: "Test",
                 birthdate: Date(),
                 createdAt: Date()
             )
-            let sleep = SyncSleepEvent(
+            let sleep = SleepEvent(
                 id: UUID(),
                 babyID: babyID,
                 startTime: Date(),
@@ -234,11 +234,11 @@ struct SyncSleepEventCRUDTests {
                 deviceID: "device-2"
             )
             try db.write { db in
-                try SyncBaby.insert { baby }.execute(db)
-                try SyncSleepEvent.insert { sleep }.execute(db)
+                try Baby.insert { baby }.execute(db)
+                try SleepEvent.insert { sleep }.execute(db)
             }
             let fetched = try db.read { db in
-                try SyncSleepEvent.fetchAll(db)
+                try SleepEvent.fetchAll(db)
             }
             #expect(fetched.count == 1)
             #expect(fetched.first?.isNightSleep == true)
@@ -251,13 +251,13 @@ struct SyncSleepEventCRUDTests {
 // MARK: - WakeEvent CRUD
 
 @Suite("SyncModels — WakeEvent CRUD")
-struct SyncWakeEventCRUDTests {
+struct WakeEventCRUDTests {
 
     @Test("Insert wake event")
     func insert() throws {
         try withDatabase { db in
             let babyID = UUID()
-            let baby = SyncBaby(
+            let baby = Baby(
                 id: babyID,
                 stableID: UUID().uuidString,
                 name: "Test",
@@ -265,18 +265,18 @@ struct SyncWakeEventCRUDTests {
                 createdAt: Date()
             )
             let now = Date()
-            let wake = SyncWakeEvent(
+            let wake = WakeEvent(
                 id: UUID(),
                 babyID: babyID,
                 date: Calendar.current.startOfDay(for: now),
                 time: now
             )
             try db.write { db in
-                try SyncBaby.insert { baby }.execute(db)
-                try SyncWakeEvent.insert { wake }.execute(db)
+                try Baby.insert { baby }.execute(db)
+                try WakeEvent.insert { wake }.execute(db)
             }
             let fetched = try db.read { db in
-                try SyncWakeEvent.fetchAll(db)
+                try WakeEvent.fetchAll(db)
             }
             #expect(fetched.count == 1)
             #expect(fetched.first?.babyID == babyID)
@@ -293,14 +293,14 @@ struct SyncForeignKeyCascadeTests {
     func cascadeDeleteFeeds() throws {
         try withDatabase { db in
             let babyID = UUID()
-            let baby = SyncBaby(
+            let baby = Baby(
                 id: babyID,
                 stableID: UUID().uuidString,
                 name: "Test",
                 birthdate: Date(),
                 createdAt: Date()
             )
-            let feed = SyncFeedEvent(
+            let feed = FeedEvent(
                 id: UUID(),
                 babyID: babyID,
                 startTime: Date(),
@@ -308,18 +308,18 @@ struct SyncForeignKeyCascadeTests {
                 amountOz: 3.0
             )
             try db.write { db in
-                try SyncBaby.insert { baby }.execute(db)
-                try SyncFeedEvent.insert { feed }.execute(db)
+                try Baby.insert { baby }.execute(db)
+                try FeedEvent.insert { feed }.execute(db)
             }
             // Verify event exists
-            var feedCount = try db.read { db in try SyncFeedEvent.fetchCount(db) }
+            var feedCount = try db.read { db in try FeedEvent.fetchCount(db) }
             #expect(feedCount == 1)
 
             // Delete baby — should cascade
             try db.write { db in
-                try SyncBaby.find(babyID).delete().execute(db)
+                try Baby.find(babyID).delete().execute(db)
             }
-            feedCount = try db.read { db in try SyncFeedEvent.fetchCount(db) }
+            feedCount = try db.read { db in try FeedEvent.fetchCount(db) }
             #expect(feedCount == 0)
         }
     }
@@ -328,7 +328,7 @@ struct SyncForeignKeyCascadeTests {
     func cascadeDeleteAll() throws {
         try withDatabase { db in
             let babyID = UUID()
-            let baby = SyncBaby(
+            let baby = Baby(
                 id: babyID,
                 stableID: UUID().uuidString,
                 name: "Test",
@@ -336,12 +336,12 @@ struct SyncForeignKeyCascadeTests {
                 createdAt: Date()
             )
             try db.write { db in
-                try SyncBaby.insert { baby }.execute(db)
-                try SyncSleepEvent.insert {
-                    SyncSleepEvent(id: UUID(), babyID: babyID, startTime: Date())
+                try Baby.insert { baby }.execute(db)
+                try SleepEvent.insert {
+                    SleepEvent(id: UUID(), babyID: babyID, startTime: Date())
                 }.execute(db)
-                try SyncWakeEvent.insert {
-                    SyncWakeEvent(
+                try WakeEvent.insert {
+                    WakeEvent(
                         id: UUID(),
                         babyID: babyID,
                         date: Calendar.current.startOfDay(for: Date()),
@@ -352,11 +352,11 @@ struct SyncForeignKeyCascadeTests {
 
             // Delete baby
             try db.write { db in
-                try SyncBaby.find(babyID).delete().execute(db)
+                try Baby.find(babyID).delete().execute(db)
             }
 
-            let sleepCount = try db.read { db in try SyncSleepEvent.fetchCount(db) }
-            let wakeCount = try db.read { db in try SyncWakeEvent.fetchCount(db) }
+            let sleepCount = try db.read { db in try SleepEvent.fetchCount(db) }
+            let wakeCount = try db.read { db in try WakeEvent.fetchCount(db) }
             #expect(sleepCount == 0)
             #expect(wakeCount == 0)
         }
@@ -365,14 +365,14 @@ struct SyncForeignKeyCascadeTests {
     @Test("Cannot insert event with non-existent baby ID")
     func fkViolation() throws {
         try withDatabase { db in
-            let orphanFeed = SyncFeedEvent(
+            let orphanFeed = FeedEvent(
                 id: UUID(),
                 babyID: UUID(), // No matching baby
                 startTime: Date()
             )
             #expect(throws: (any Error).self) {
                 try db.write { db in
-                    try SyncFeedEvent.insert { orphanFeed }.execute(db)
+                    try FeedEvent.insert { orphanFeed }.execute(db)
                 }
             }
         }
@@ -389,8 +389,8 @@ struct SyncEnumStorageTests {
         try withDatabase { db in
             let babyID = UUID()
             try db.write { db in
-                try SyncBaby.insert {
-                    SyncBaby(
+                try Baby.insert {
+                    Baby(
                         id: babyID,
                         stableID: UUID().uuidString,
                         name: "Test",
@@ -399,9 +399,9 @@ struct SyncEnumStorageTests {
                     )
                 }.execute(db)
 
-                for kind in SyncFeedKind.allCases {
-                    try SyncFeedEvent.insert {
-                        SyncFeedEvent(
+                for kind in FeedKind.allCases {
+                    try FeedEvent.insert {
+                        FeedEvent(
                             id: UUID(),
                             babyID: babyID,
                             startTime: Date(),
@@ -411,10 +411,10 @@ struct SyncEnumStorageTests {
                 }
             }
             let events = try db.read { db in
-                try SyncFeedEvent.fetchAll(db)
+                try FeedEvent.fetchAll(db)
             }
             let kinds = Set(events.map(\.feedKind))
-            #expect(kinds == Set(SyncFeedKind.allCases))
+            #expect(kinds == Set(FeedKind.allCases))
         }
     }
 
@@ -423,8 +423,8 @@ struct SyncEnumStorageTests {
         try withDatabase { db in
             let babyID = UUID()
             try db.write { db in
-                try SyncBaby.insert {
-                    SyncBaby(
+                try Baby.insert {
+                    Baby(
                         id: babyID,
                         stableID: UUID().uuidString,
                         name: "Test",
@@ -433,9 +433,9 @@ struct SyncEnumStorageTests {
                     )
                 }.execute(db)
 
-                for side in SyncNursingSide.allCases {
-                    try SyncFeedEvent.insert {
-                        SyncFeedEvent(
+                for side in NursingSide.allCases {
+                    try FeedEvent.insert {
+                        FeedEvent(
                             id: UUID(),
                             babyID: babyID,
                             startTime: Date(),
@@ -445,10 +445,10 @@ struct SyncEnumStorageTests {
                 }
             }
             let events = try db.read { db in
-                try SyncFeedEvent.fetchAll(db)
+                try FeedEvent.fetchAll(db)
             }
             let sides = Set(events.map(\.nursingSide))
-            #expect(sides == Set(SyncNursingSide.allCases))
+            #expect(sides == Set(NursingSide.allCases))
         }
     }
 }

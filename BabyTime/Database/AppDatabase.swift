@@ -23,6 +23,7 @@ extension DependencyValues {
         }
         let database = try SQLiteData.defaultDatabase(configuration: configuration)
         try Self.runMigrations(on: database)
+        SwiftDataMigrator.migrateIfNeeded(to: database)
         defaultDatabase = database
     }
 

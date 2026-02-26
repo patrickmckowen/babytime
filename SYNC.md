@@ -160,7 +160,7 @@ Last-write-wins is acceptable (wake time is the same either way).
 - `-skipMacroValidation` is required — the project uses SPM macro packages
   (StructuredQueries, Perception) that won't compile without it
 - DayEngine tests are pure-functional and don't touch the database
-- 109 tests across 22 suites, runs in <1 second
+- 125 tests across 28 suites, runs in <2 seconds
 
 ## Migration State
 
@@ -170,7 +170,7 @@ Last-write-wins is acceptable (wake time is the same either way).
 | 2. ActivityManager rewrite | **Complete** | ModelContext → DatabaseWriter, all queries use StructuredQueries |
 | 3. View updates | **Complete** | SwiftData imports removed, bindings use ActivityManager |
 | 4. Test migration | **Complete** | 109 tests across 22 suites passing |
-| 4a. SwiftData → SQLite data migration | Not started | One-time migration on first launch; prerequisite for shipping to physical devices |
+| 4a. SwiftData → SQLite data migration | **Complete** | One-time first-launch migration via GRDB raw SQL; idempotent via UserDefaults flag |
 | 5. CloudKit private sync | Not started | Depends on Phases 1-4 |
 | 6. CloudKit sharing (CKShare) | Not started | Depends on Phase 5 |
 | 7. Polish (migration, cleanup, sync UI) | Not started | Depends on Phase 6 |
@@ -180,7 +180,9 @@ Last-write-wins is acceptable (wake time is the same either way).
 ### Database layer
 - `BabyTime/Database/Models.swift` — `@Table` structs (Baby, FeedEvent, SleepEvent, WakeEvent)
 - `BabyTime/Database/AppDatabase.swift` — database setup + DependencyValues extensions
+- `BabyTime/Database/SwiftDataMigrator.swift` — one-time migration from old SwiftData (CoreData) store
 - `BabyTimeTests/SyncModelTests.swift` — schema verification and CRUD tests
+- `BabyTimeTests/SwiftDataMigrationTests.swift` — migration logic tests
 
 ### Application layer
 - `BabyTime/Models/ActivityManager.swift` — all persistence via `DatabaseWriter`

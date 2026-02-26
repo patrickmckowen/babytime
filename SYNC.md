@@ -160,7 +160,7 @@ Last-write-wins is acceptable (wake time is the same either way).
 - `-skipMacroValidation` is required — the project uses SPM macro packages
   (StructuredQueries, Perception) that won't compile without it
 - DayEngine tests are pure-functional and don't touch the database
-- 125 tests across 28 suites, runs in <2 seconds
+- 133 tests across 31 suites, runs in <2 seconds
 
 ## Migration State
 

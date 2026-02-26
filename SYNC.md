@@ -156,8 +156,11 @@ Last-write-wins is acceptable (wake time is the same either way).
 
 - Use in-memory `DatabaseQueue()` — no file system, no CloudKit
 - Test command: `xcodebuild test -only-testing:BabyTimeTests
-  -parallel-testing-enabled NO`
+  -parallel-testing-enabled NO -skipMacroValidation`
+- `-skipMacroValidation` is required — the project uses SPM macro packages
+  (StructuredQueries, Perception) that won't compile without it
 - DayEngine tests are pure-functional and don't touch the database
+- 109 tests across 22 suites, runs in <1 second
 
 ## Migration State
 
@@ -167,6 +170,7 @@ Last-write-wins is acceptable (wake time is the same either way).
 | 2. ActivityManager rewrite | **Complete** | ModelContext → DatabaseWriter, all queries use StructuredQueries |
 | 3. View updates | **Complete** | SwiftData imports removed, bindings use ActivityManager |
 | 4. Test migration | **Complete** | 109 tests across 22 suites passing |
+| 4a. SwiftData → SQLite data migration | Not started | One-time migration on first launch; prerequisite for shipping to physical devices |
 | 5. CloudKit private sync | Not started | Depends on Phases 1-4 |
 | 6. CloudKit sharing (CKShare) | Not started | Depends on Phase 5 |
 | 7. Polish (migration, cleanup, sync UI) | Not started | Depends on Phase 6 |
@@ -187,6 +191,66 @@ Last-write-wins is acceptable (wake time is the same either way).
 - `BabyTime/Engine/AgeTable.swift` — pure data
 - `BabyTime/Models/DeviceIdentity.swift` — UserDefaults only
 - `BabyTime/Models/DayState.swift` — pure value types
+
+## StructuredQueries API Reference
+
+The project uses [StructuredQueries](https://github.com/pointfreeco/swift-structured-queries)
+(v0.31.0) for type-safe SQL. Key patterns an agent must follow:
+
+### Filtering (`.where`)
+```swift
+// Equality — use .eq(), NOT ==  (== is intentionally unavailable)
+.where { $0.babyID.eq(#bind(babyID)) }
+
+// Nil checks — use .is(nil) / .isNot(nil), NOT == nil
+.where { $0.endTime.is(nil) }
+.where { $0.endTime.isNot(nil) }
+
+// Comparison operators work directly
+.where { $0.startTime >= #bind(cutoff) }
+.where { $0.startTime < #bind(endOfDay) }
+
+// Multiple conditions — must be a SINGLE expression with &&
+// Do NOT use multi-line statements (result builder won't compile)
+.where { $0.babyID.eq(#bind(id)) && $0.endTime.is(nil) && $0.isNightSleep.eq(true) }
+```
+
+### Ordering (`.order`)
+```swift
+.order { $0.startTime.asc() }
+.order { $0.startTime.desc() }
+```
+
+### Updates (`.update`)
+```swift
+// ALL variable values need #bind()
+.update { $0.endTime = #bind(now) }
+.update { $0.name = #bind(baby.name) }
+
+// nil needs #bind with explicit type cast
+.update { $0.endTime = #bind(nil as Date?) }
+
+// String/bool/int LITERALS work without #bind
+.update { $0.name = "Updated" }
+.update { $0.isNightSleep = true }
+```
+
+### Common operations
+```swift
+// Fetch
+try Baby.all().fetchAll(db)
+try FeedEvent.where { $0.babyID.eq(#bind(id)) }.fetchOne(db)
+try FeedEvent.where { $0.babyID.eq(#bind(id)) }.fetchCount(db)
+
+// Insert
+try Baby.insert { ... }.execute(db)
+
+// Update by ID
+try Baby.find(id).update { $0.name = #bind(name) }.execute(db)
+
+// Delete
+try Baby.find(id).delete().execute(db)
+```
 
 ## Agent Coordination Rules
 

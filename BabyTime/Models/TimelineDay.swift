@@ -83,12 +83,12 @@ extension TimelineDay {
         }
 
         let dayEnd: Date
-        if isToday {
-            dayEnd = now
-        } else if let ns = nightSleep {
+        if let ns = nightSleep {
             dayEnd = ns.startTime
         } else if let bt = bedtime {
-            dayEnd = bt
+            dayEnd = isToday ? max(bt, now) : bt
+        } else if isToday {
+            dayEnd = now
         } else {
             // Fallback: end of last event or end of day
             let lastFeedEnd = feeds.compactMap { feedEndTime($0) }.max()

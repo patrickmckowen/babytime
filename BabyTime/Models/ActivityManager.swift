@@ -21,6 +21,10 @@ final class ActivityManager {
     private(set) var baby: Baby?
     private(set) var allBabies: [Baby] = []
 
+    // MARK: - Revision Tracking (triggers @Observable re-evaluation for direct DB queries)
+
+    private(set) var dataVersion: Int = 0
+
     // MARK: - Derived State
 
     private(set) var snapshot: DaySnapshot?
@@ -126,6 +130,7 @@ final class ActivityManager {
         loadTodayEvents()
         computeSnapshot()
         scheduleNotifications()
+        dataVersion += 1
     }
 
     private func syncActiveEvents() {

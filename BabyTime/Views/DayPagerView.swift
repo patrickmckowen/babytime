@@ -52,6 +52,7 @@ struct DayPagerView: View {
 
     @ViewBuilder
     private func dayPage(for date: Date) -> some View {
+        let _ = activityManager.dataVersion
         let timeline = buildTimeline(for: date)
 
         VStack(spacing: 0) {

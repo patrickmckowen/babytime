@@ -142,7 +142,7 @@ struct NursingSheetView: View {
         VStack(spacing: 8) {
             SwiftUI.TimelineView(.periodic(from: .now, by: 1)) { context in
                 Text(durationString(at: context.date))
-                    .font(.system(size: 72, weight: .bold))
+                    .font(.system(size: 56, weight: .bold))
                     .monospacedDigit()
                     .tracking(-2)
                     .foregroundStyle(Color.btTextPrimary)

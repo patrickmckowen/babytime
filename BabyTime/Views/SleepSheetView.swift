@@ -22,6 +22,7 @@ struct SleepSheetView: View {
 
     // Cooldown: suppresses timer toggle briefly after a DatePicker tap
     @State private var pickerInteractionDate: Date?
+    @State private var showDeleteConfirmation = false
 
     private var isEditing: Bool { editingEvent != nil }
 
@@ -79,6 +80,16 @@ struct SleepSheetView: View {
                         Image(systemName: "chevron.down")
                     }
                 }
+                if let event = editingEvent {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Button {
+                            showDeleteConfirmation = true
+                        } label: {
+                            Image(systemName: "trash")
+                        }
+                        .tint(.red)
+                    }
+                }
                 ToolbarItem(placement: .confirmationAction) {
                     Button(role: .confirm) {
                         if let event = editingEvent, let start = draftStartTime, let end = draftEndTime {
@@ -93,6 +104,15 @@ struct SleepSheetView: View {
                     .tint(Color.btSleepAccent)
                     .disabled(!canSave)
                 }
+            }
+            .alert("Delete this event?", isPresented: $showDeleteConfirmation) {
+                Button("Delete", role: .destructive) {
+                    if let event = editingEvent {
+                        activityManager.deleteSleepEvent(event)
+                    }
+                    dismiss()
+                }
+                Button("Cancel", role: .cancel) { }
             }
         }
         .onAppear {

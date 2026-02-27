@@ -75,19 +75,20 @@ struct DayPagerView: View {
     private func eventList(_ events: [LogEntry]) -> some View {
         List {
             ForEach(events.sorted(by: { $0.startTime > $1.startTime })) { entry in
-                LogRow(entry: entry, babyName: activityManager.babyName)
-                    .listRowBackground(Color.btBackground)
-                    .listRowInsets(EdgeInsets())
-                    .contentShape(Rectangle())
-                    .onTapGesture { tapEvent(entry) }
-                    .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-                        Button(role: .destructive) {
-                            entryToDelete = entry
-                            showDeleteConfirmation = true
-                        } label: {
-                            Label("Delete", systemImage: "trash")
-                        }
+                Button { tapEvent(entry) } label: {
+                    LogRow(entry: entry, babyName: activityManager.babyName)
+                }
+                .buttonStyle(.plain)
+                .listRowBackground(Color.btBackground)
+                .listRowInsets(EdgeInsets())
+                .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                    Button(role: .destructive) {
+                        entryToDelete = entry
+                        showDeleteConfirmation = true
+                    } label: {
+                        Label("Delete", systemImage: "trash")
                     }
+                }
             }
         }
         .listStyle(.plain)

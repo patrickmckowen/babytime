@@ -54,6 +54,9 @@ struct BabyTimeApp: App {
             ContentView()
                 .environment(activityManager)
                 .preferredColorScheme(.light)
+                .task {
+                    UIApplication.shared.registerForRemoteNotifications()
+                }
                 .onChange(of: scenePhase) { _, newPhase in
                     if newPhase == .active {
                         activityManager.refresh()

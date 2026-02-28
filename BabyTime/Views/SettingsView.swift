@@ -5,12 +5,17 @@
 //  Settings: baby info, schedule, baby list, add/delete.
 //
 
-import SwiftUI
+import CloudKit
+import Dependencies
 import PhotosUI
+import SQLiteData
+import SwiftUI
 
 struct SettingsView: View {
     @Environment(ActivityManager.self) private var activityManager
     @Environment(\.dismiss) private var dismiss
+    @State private var sharedRecord: SharedRecord?
+    @State private var shareError: String?
 
     var body: some View {
         NavigationStack {
@@ -19,6 +24,7 @@ struct SettingsView: View {
                     if let baby = activityManager.baby {
                         babyInfoCard(baby)
                         scheduleCard(baby)
+                        sharingCard(baby)
                     }
 
                     if activityManager.allBabies.count > 1 {
@@ -33,6 +39,17 @@ struct SettingsView: View {
             .background(Color.btBackground)
             .navigationTitle("Settings")
             .navigationBarTitleDisplayMode(.inline)
+            .sheet(item: $sharedRecord) { record in
+                CloudSharingView(sharedRecord: record)
+            }
+            .alert("Sharing Error", isPresented: Binding(
+                get: { shareError != nil },
+                set: { if !$0 { shareError = nil } }
+            )) {
+                Button("OK", role: .cancel) { }
+            } message: {
+                Text(shareError ?? "")
+            }
         }
     }
 
@@ -131,6 +148,82 @@ struct SettingsView: View {
         .background(Color.btBackground)
         .clipShape(RoundedRectangle(cornerRadius: BTRadius.card, style: .continuous))
         .cardShadow()
+    }
+
+    // MARK: - Sharing Card
+
+    private func sharingCard(_ baby: Baby) -> some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text("Sharing")
+                .font(BTTypography.photoDate)
+                .tracking(BTTracking.photoDate)
+                .foregroundStyle(Color.btTextPrimary)
+
+            if activityManager.isBabyShared(baby) {
+                let count = activityManager.shareParticipantCount(baby)
+                HStack {
+                    Text("Shared with \(count) caregiver\(count == 1 ? "" : "s")")
+                        .font(BTTypography.label)
+                        .tracking(BTTracking.label)
+                        .foregroundStyle(Color.btTextSecondary)
+
+                    Spacer()
+
+                    Button("Manage") {
+                        openManageSharing(baby)
+                    }
+                    .font(BTTypography.label)
+                    .tracking(BTTracking.label)
+                    .foregroundStyle(Color.btFeedAccent)
+                }
+            } else {
+                Button {
+                    startSharing(baby)
+                } label: {
+                    HStack {
+                        Image(systemName: "person.badge.plus")
+                        Text("Share with Family")
+                    }
+                    .font(BTTypography.label)
+                    .tracking(BTTracking.label)
+                    .foregroundStyle(Color.btFeedAccent)
+                }
+            }
+        }
+        .padding(.top, BTSpacing.cardPaddingTop)
+        .padding(.horizontal, BTSpacing.cardPaddingHorizontal)
+        .padding(.bottom, BTSpacing.cardPaddingBottom)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.btBackground)
+        .clipShape(RoundedRectangle(cornerRadius: BTRadius.card, style: .continuous))
+        .cardShadow()
+    }
+
+    private func startSharing(_ baby: Baby) {
+        Task {
+            do {
+                @Dependency(\.defaultSyncEngine) var syncEngine
+                sharedRecord = try await syncEngine.share(record: baby) { share in
+                    share[CKShare.SystemFieldKey.title] = "\(baby.name)'s BabyTime"
+                    if let photoData = baby.photoData {
+                        share[CKShare.SystemFieldKey.thumbnailImageData] = photoData
+                    }
+                }
+            } catch {
+                shareError = "Unable to share. Make sure you're signed into iCloud and try again."
+            }
+        }
+    }
+
+    private func openManageSharing(_ baby: Baby) {
+        Task {
+            do {
+                @Dependency(\.defaultSyncEngine) var syncEngine
+                sharedRecord = try await syncEngine.share(record: baby) { _ in }
+            } catch {
+                shareError = "Unable to open sharing settings. Please try again."
+            }
+        }
     }
 
     // MARK: - Baby Selector

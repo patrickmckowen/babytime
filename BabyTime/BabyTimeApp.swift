@@ -12,6 +12,7 @@ import UserNotifications
 
 @main
 struct BabyTimeApp: App {
+    @UIApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @State private var activityManager: ActivityManager
     @State private var syncDelegate: SyncDelegate?
     @Environment(\.scenePhase) private var scenePhase

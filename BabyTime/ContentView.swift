@@ -79,9 +79,21 @@ struct ContentView: View {
         .onAppear {
             selectBabyFromStorage()
         }
-        .onChange(of: activityManager.allBabies.count) {
+        .onChange(of: activityManager.allBabies.count) { oldCount, newCount in
             if activityManager.baby == nil {
                 selectBabyFromStorage()
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .didAcceptCloudKitShare)) { _ in
+            let knownIDs = Set(activityManager.allBabies.map(\.stableID))
+            // Give CloudKit a moment to sync the shared baby
+            Task {
+                try? await Task.sleep(for: .seconds(2))
+                activityManager.loadBabies()
+                if let newBaby = activityManager.allBabies.first(where: { !knownIDs.contains($0.stableID) }) {
+                    activityManager.selectBaby(newBaby)
+                    selectedBabyID = newBaby.stableID
+                }
             }
         }
     }

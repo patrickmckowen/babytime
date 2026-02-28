@@ -6,6 +6,7 @@
 //  Persists active timers immediately for multi-device sync + crash recovery.
 //
 
+import CloudKit
 import Foundation
 import GRDB
 import SwiftUI
@@ -1024,5 +1025,25 @@ final class ActivityManager {
         guard feedCount > 0 else { return "--" }
         let avg = totalIntakeOz / Double(feedCount)
         return String(format: "%.1f oz", avg)
+    }
+
+    // MARK: - Sharing (Phase 6)
+
+    func shareForBaby(_ baby: Baby) -> CKShare? {
+        try? database.read { db in
+            try SyncMetadata
+                .find(baby.syncMetadataID)
+                .select(\.share)
+                .fetchOne(db)
+        } ?? nil
+    }
+
+    func isBabyShared(_ baby: Baby) -> Bool {
+        shareForBaby(baby) != nil
+    }
+
+    func shareParticipantCount(_ baby: Baby) -> Int {
+        guard let share = shareForBaby(baby) else { return 0 }
+        return share.participants.count
     }
 }

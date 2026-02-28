@@ -22,6 +22,7 @@ struct NursingSheetView: View {
 
     // Cooldown: suppresses timer toggle briefly after a DatePicker tap
     @State private var pickerInteractionDate: Date?
+    @State private var showDeleteConfirmation = false
 
     private var isEditing: Bool { editingEvent != nil }
 
@@ -79,6 +80,16 @@ struct NursingSheetView: View {
                         Image(systemName: "chevron.down")
                     }
                 }
+                if let event = editingEvent {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Button {
+                            showDeleteConfirmation = true
+                        } label: {
+                            Image(systemName: "trash")
+                        }
+                        .tint(.red)
+                    }
+                }
                 ToolbarItem(placement: .confirmationAction) {
                     Button(role: .confirm) {
                         if let event = editingEvent, let start = draftStartTime, let end = draftEndTime {
@@ -93,6 +104,15 @@ struct NursingSheetView: View {
                     .tint(Color.btFeedAccent)
                     .disabled(!canSave)
                 }
+            }
+            .alert("Delete this event?", isPresented: $showDeleteConfirmation) {
+                Button("Delete", role: .destructive) {
+                    if let event = editingEvent {
+                        activityManager.deleteFeedEvent(event)
+                    }
+                    dismiss()
+                }
+                Button("Cancel", role: .cancel) { }
             }
         }
         .onAppear {
@@ -120,7 +140,7 @@ struct NursingSheetView: View {
     // MARK: - Timer Display
 
     private func durationString(at date: Date) -> String {
-        guard let start = effectiveStartTime else { return "00 : 00 : 00" }
+        guard let start = effectiveStartTime else { return "00 : 00" }
 
         let reference: Date
         if activityManager.isNursingActive {
@@ -128,21 +148,24 @@ struct NursingSheetView: View {
         } else if let end = effectiveEndTime {
             reference = end                       // static stopped/draft duration
         } else {
-            return "00 : 00 : 00"                 // draft start only → no duration yet
+            return "00 : 00"                      // draft start only → no duration yet
         }
 
         let elapsed = max(0, reference.timeIntervalSince(start))
         let hours = Int(elapsed) / 3600
         let minutes = (Int(elapsed) % 3600) / 60
         let seconds = Int(elapsed) % 60
-        return String(format: "%02d : %02d : %02d", hours, minutes, seconds)
+        if hours > 0 {
+            return String(format: "%01d : %02d : %02d", hours, minutes, seconds)
+        }
+        return String(format: "%02d : %02d", minutes, seconds)
     }
 
     private var timerDisplay: some View {
         VStack(spacing: 8) {
             SwiftUI.TimelineView(.periodic(from: .now, by: 1)) { context in
                 Text(durationString(at: context.date))
-                    .font(.system(size: 56, weight: .bold))
+                    .font(.system(size: 72, weight: .regular))
                     .monospacedDigit()
                     .tracking(-2)
                     .foregroundStyle(Color.btTextPrimary)

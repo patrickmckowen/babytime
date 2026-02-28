@@ -16,6 +16,7 @@ struct BottleSheetView: View {
 
     @State private var amountOz: Double = 4.0
     @State private var selectedTime: Date = Date()
+    @State private var showDeleteConfirmation = false
 
     private var isEditing: Bool { editingEvent != nil }
 
@@ -41,6 +42,16 @@ struct BottleSheetView: View {
                         dismiss()
                     }
                 }
+                if let event = editingEvent {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Button {
+                            showDeleteConfirmation = true
+                        } label: {
+                            Image(systemName: "trash")
+                        }
+                        .tint(.red)
+                    }
+                }
                 ToolbarItem(placement: .confirmationAction) {
                     Button(role: .confirm) {
                         if let event = editingEvent {
@@ -52,6 +63,15 @@ struct BottleSheetView: View {
                     }
                     .tint(Color.btFeedAccent)
                 }
+            }
+            .alert("Delete this event?", isPresented: $showDeleteConfirmation) {
+                Button("Delete", role: .destructive) {
+                    if let event = editingEvent {
+                        activityManager.deleteFeedEvent(event)
+                    }
+                    dismiss()
+                }
+                Button("Cancel", role: .cancel) { }
             }
         }
         .onAppear {

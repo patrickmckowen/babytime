@@ -136,6 +136,35 @@ extension DependencyValues {
             .execute(db)
         }
 
+        migrator.registerMigration("Add WakeEvent uniqueness + dedup") { db in
+            // One-time dedup of any existing duplicates (keep earliest by rowid)
+            try #sql("""
+                DELETE FROM "syncWakeEvents"
+                WHERE rowid NOT IN (
+                    SELECT MIN(rowid) FROM "syncWakeEvents"
+                    GROUP BY "babyID", "date"
+                )
+            """).execute(db)
+
+            // Non-unique — CloudKit sync can't have UNIQUE constraints on synced tables.
+            // Application-level dedup runs in autoCloseStaleEvents() instead.
+            try #sql("""
+                CREATE INDEX IF NOT EXISTS "idx_syncWakeEvents_babyID_date"
+                ON "syncWakeEvents"("babyID", "date")
+            """).execute(db)
+        }
+
+        migrator.registerMigration("Fix WakeEvent index uniqueness") { db in
+            try #sql("""
+                DROP INDEX IF EXISTS "idx_syncWakeEvents_babyID_date"
+            """).execute(db)
+
+            try #sql("""
+                CREATE INDEX "idx_syncWakeEvents_babyID_date"
+                ON "syncWakeEvents"("babyID", "date")
+            """).execute(db)
+        }
+
         try migrator.migrate(database)
     }
 }

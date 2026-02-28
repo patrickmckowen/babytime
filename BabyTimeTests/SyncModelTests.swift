@@ -284,6 +284,99 @@ struct WakeEventCRUDTests {
     }
 }
 
+// MARK: - WakeEvent Uniqueness Tests
+
+@Suite("SyncModels — WakeEvent Dedup")
+struct WakeEventDedupTests {
+
+    @Test("Duplicate WakeEvents allowed at DB level (no UNIQUE — CloudKit requirement)")
+    func duplicatesAllowed() throws {
+        try withDatabase { db in
+            let babyID = UUID()
+            let baby = Baby(
+                id: babyID,
+                stableID: UUID().uuidString,
+                name: "Test",
+                birthdate: Date(),
+                createdAt: Date()
+            )
+            let today = Calendar.current.startOfDay(for: Date())
+            try db.write { db in
+                try Baby.insert { baby }.execute(db)
+                try WakeEvent.insert {
+                    WakeEvent(id: UUID(), babyID: babyID, date: today, time: Date())
+                }.execute(db)
+                try WakeEvent.insert {
+                    WakeEvent(id: UUID(), babyID: babyID, date: today, time: Date().addingTimeInterval(3600))
+                }.execute(db)
+            }
+            // Both inserts succeed — dedup happens at application level
+            let count = try db.read { db in try WakeEvent.fetchCount(db) }
+            #expect(count == 2)
+        }
+    }
+
+    @Test("Different babies can have WakeEvent on same date")
+    func differentBabiesSameDate() throws {
+        try withDatabase { db in
+            let babyID1 = UUID()
+            let babyID2 = UUID()
+            let today = Calendar.current.startOfDay(for: Date())
+            try db.write { db in
+                try Baby.insert {
+                    Baby(id: babyID1, stableID: UUID().uuidString, name: "Baby1", birthdate: Date(), createdAt: Date())
+                }.execute(db)
+                try Baby.insert {
+                    Baby(id: babyID2, stableID: UUID().uuidString, name: "Baby2", birthdate: Date(), createdAt: Date())
+                }.execute(db)
+                try WakeEvent.insert {
+                    WakeEvent(id: UUID(), babyID: babyID1, date: today, time: Date())
+                }.execute(db)
+                try WakeEvent.insert {
+                    WakeEvent(id: UUID(), babyID: babyID2, date: today, time: Date())
+                }.execute(db)
+            }
+            let count = try db.read { db in try WakeEvent.fetchCount(db) }
+            #expect(count == 2)
+        }
+    }
+
+    @Test("Same baby can have WakeEvent on different dates")
+    func sameBabyDifferentDates() throws {
+        try withDatabase { db in
+            let babyID = UUID()
+            let today = Calendar.current.startOfDay(for: Date())
+            let yesterday = today.addingTimeInterval(-86400)
+            try db.write { db in
+                try Baby.insert {
+                    Baby(id: babyID, stableID: UUID().uuidString, name: "Test", birthdate: Date(), createdAt: Date())
+                }.execute(db)
+                try WakeEvent.insert {
+                    WakeEvent(id: UUID(), babyID: babyID, date: today, time: Date())
+                }.execute(db)
+                try WakeEvent.insert {
+                    WakeEvent(id: UUID(), babyID: babyID, date: yesterday, time: yesterday)
+                }.execute(db)
+            }
+            let count = try db.read { db in try WakeEvent.fetchCount(db) }
+            #expect(count == 2)
+        }
+    }
+
+    @Test("Composite index exists after migration")
+    func compositeIndexExists() throws {
+        try withDatabase { db in
+            let indexes = try db.read { db in
+                try String.fetchAll(
+                    db,
+                    sql: "SELECT name FROM sqlite_master WHERE type='index' AND name = 'idx_syncWakeEvents_babyID_date'"
+                )
+            }
+            #expect(indexes.count == 1)
+        }
+    }
+}
+
 // MARK: - Foreign Key Cascade Tests
 
 @Suite("SyncModels — Foreign Key Cascades")

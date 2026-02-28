@@ -140,7 +140,7 @@ struct NursingSheetView: View {
     // MARK: - Timer Display
 
     private func durationString(at date: Date) -> String {
-        guard let start = effectiveStartTime else { return "00 : 00 : 00" }
+        guard let start = effectiveStartTime else { return "00 : 00" }
 
         let reference: Date
         if activityManager.isNursingActive {
@@ -148,21 +148,24 @@ struct NursingSheetView: View {
         } else if let end = effectiveEndTime {
             reference = end                       // static stopped/draft duration
         } else {
-            return "00 : 00 : 00"                 // draft start only → no duration yet
+            return "00 : 00"                      // draft start only → no duration yet
         }
 
         let elapsed = max(0, reference.timeIntervalSince(start))
         let hours = Int(elapsed) / 3600
         let minutes = (Int(elapsed) % 3600) / 60
         let seconds = Int(elapsed) % 60
-        return String(format: "%02d : %02d : %02d", hours, minutes, seconds)
+        if hours > 0 {
+            return String(format: "%01d : %02d : %02d", hours, minutes, seconds)
+        }
+        return String(format: "%02d : %02d", minutes, seconds)
     }
 
     private var timerDisplay: some View {
         VStack(spacing: 8) {
             SwiftUI.TimelineView(.periodic(from: .now, by: 1)) { context in
                 Text(durationString(at: context.date))
-                    .font(.system(size: 56, weight: .bold))
+                    .font(.system(size: 72, weight: .regular))
                     .monospacedDigit()
                     .tracking(-2)
                     .foregroundStyle(Color.btTextPrimary)

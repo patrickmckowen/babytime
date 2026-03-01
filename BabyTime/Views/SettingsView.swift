@@ -205,8 +205,11 @@ struct SettingsView: View {
                 @Dependency(\.defaultSyncEngine) var syncEngine
                 sharedRecord = try await syncEngine.share(record: baby) { share in
                     share[CKShare.SystemFieldKey.title] = "\(baby.name)'s BabyTime"
-                    if let photoData = baby.photoData {
-                        share[CKShare.SystemFieldKey.thumbnailImageData] = photoData
+                    if let photoData = baby.photoData,
+                       let thumbnail = ImageUtilities.resizeForProfile(
+                           data: photoData, maxDimension: 256, quality: 0.5
+                       ) {
+                        share[CKShare.SystemFieldKey.thumbnailImageData] = thumbnail
                     }
                 }
             } catch {

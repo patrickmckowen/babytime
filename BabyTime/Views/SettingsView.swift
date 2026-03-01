@@ -210,7 +210,7 @@ struct SettingsView: View {
                     }
                 }
             } catch {
-                shareError = "Unable to share. Make sure you're signed into iCloud and try again."
+                shareError = "Share failed: \(error)"
             }
         }
     }
@@ -221,7 +221,7 @@ struct SettingsView: View {
                 @Dependency(\.defaultSyncEngine) var syncEngine
                 sharedRecord = try await syncEngine.share(record: baby) { _ in }
             } catch {
-                shareError = "Unable to open sharing settings. Please try again."
+                shareError = "Manage sharing failed: \(error)"
             }
         }
     }

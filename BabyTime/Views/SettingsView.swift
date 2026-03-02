@@ -418,6 +418,7 @@ struct AddBabyView: View {
 
 struct WelcomeView: View {
     @Environment(ActivityManager.self) private var activityManager
+    @AppStorage("selectedBabyID") private var selectedBabyID: String?
 
     @State private var name = "Kaia"
     @State private var birthdate = Calendar.current.date(
@@ -532,6 +533,7 @@ struct WelcomeView: View {
                     photoData: photoData
                 )
                 activityManager.selectBaby(baby)
+                selectedBabyID = baby.stableID
             } label: {
                 Text("Get Started")
                     .font(BTTypography.label)

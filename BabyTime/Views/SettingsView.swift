@@ -16,6 +16,11 @@ struct SettingsView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var sharedRecord: SharedRecord?
     @State private var shareError: String?
+    @State private var showJoinShare = false
+    @State private var engineRunning = false
+    @State private var engineSyncing = false
+    @State private var engineSending = false
+    @State private var engineFetching = false
 
     var body: some View {
         NavigationStack {
@@ -32,6 +37,8 @@ struct SettingsView: View {
                     }
 
                     addBabyButton
+                    joinShareButton
+                    syncDiagnosticsCard
                 }
                 .padding(.horizontal, BTSpacing.pageMargin)
                 .padding(.vertical, 20)
@@ -49,6 +56,9 @@ struct SettingsView: View {
                 Button("OK", role: .cancel) { }
             } message: {
                 Text(shareError ?? "")
+            }
+            .sheet(isPresented: $showJoinShare) {
+                JoinShareView()
             }
         }
     }
@@ -226,6 +236,98 @@ struct SettingsView: View {
             } catch {
                 shareError = "Manage sharing failed: \(error)"
             }
+        }
+    }
+
+    // MARK: - Join Shared Baby
+
+    private var joinShareButton: some View {
+        Button {
+            showJoinShare = true
+        } label: {
+            HStack {
+                Image(systemName: "person.crop.circle.badge.plus")
+                Text("Join Shared Baby")
+            }
+            .font(BTTypography.label)
+            .tracking(BTTracking.label)
+            .foregroundStyle(Color.btFeedAccent)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 16)
+            .background(Color.btBackground)
+            .clipShape(RoundedRectangle(cornerRadius: BTRadius.card, style: .continuous))
+            .cardShadow()
+        }
+    }
+
+    // MARK: - Sync Diagnostics
+
+    private var syncDiagnosticsCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Text("Sync Diagnostics")
+                    .font(BTTypography.photoDate)
+                    .tracking(BTTracking.photoDate)
+                    .foregroundStyle(Color.btTextPrimary)
+
+                Spacer()
+
+                Button {
+                    refreshDiagnostics()
+                } label: {
+                    Image(systemName: "arrow.clockwise")
+                        .foregroundStyle(Color.btFeedAccent)
+                }
+            }
+
+            diagnosticRow("Engine", value: engineRunning ? "Running" : "Stopped")
+            diagnosticRow("Syncing", value: engineSyncing ? "Yes" : "No")
+            diagnosticRow("Sending", value: engineSending ? "Yes" : "No")
+            diagnosticRow("Fetching", value: engineFetching ? "Yes" : "No")
+
+            Divider()
+                .foregroundStyle(Color.btDivider)
+
+            ForEach(activityManager.allBabies, id: \.stableID) { baby in
+                let hasServer = activityManager.hasSyncServerRecord(baby)
+                let shared = activityManager.isBabyShared(baby)
+                diagnosticRow(
+                    baby.name.isEmpty ? "Unnamed" : baby.name,
+                    value: hasServer ? (shared ? "Synced + Shared" : "Synced") : "Local Only"
+                )
+            }
+        }
+        .padding(.top, BTSpacing.cardPaddingTop)
+        .padding(.horizontal, BTSpacing.cardPaddingHorizontal)
+        .padding(.bottom, BTSpacing.cardPaddingBottom)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.btBackground)
+        .clipShape(RoundedRectangle(cornerRadius: BTRadius.card, style: .continuous))
+        .cardShadow()
+        .task { refreshDiagnostics() }
+    }
+
+    private func diagnosticRow(_ label: String, value: String) -> some View {
+        HStack {
+            Text(label)
+                .font(BTTypography.label)
+                .tracking(BTTracking.label)
+                .foregroundStyle(Color.btTextSecondary)
+            Spacer()
+            Text(value)
+                .font(BTTypography.label)
+                .tracking(BTTracking.label)
+                .foregroundStyle(value == "Local Only" || value == "Stopped" ? Color.orange : Color.btTextPrimary)
+        }
+    }
+
+    private func refreshDiagnostics() {
+        Task { @MainActor in
+            @Dependency(\.defaultSyncEngine) var syncEngine
+            engineRunning = syncEngine.isRunning
+            engineSyncing = syncEngine.isSynchronizing
+            engineSending = syncEngine.isSendingChanges
+            engineFetching = syncEngine.isFetchingChanges
         }
     }
 

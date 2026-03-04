@@ -1161,4 +1161,12 @@ final class ActivityManager {
         guard let share = shareForBaby(baby) else { return 0 }
         return share.participants.count
     }
+
+    func hasSyncServerRecord(_ baby: Baby) -> Bool {
+        (try? database.read { db in
+            try SyncMetadata
+                .find(baby.syncMetadataID)
+                .fetchOne(db)
+        })?.hasLastKnownServerRecord ?? false
+    }
 }

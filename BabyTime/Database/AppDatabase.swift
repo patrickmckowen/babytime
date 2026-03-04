@@ -8,6 +8,7 @@
 
 import Dependencies
 import Foundation
+import GRDB
 import SQLiteData
 
 // MARK: - Database Bootstrap
@@ -163,6 +164,25 @@ extension DependencyValues {
                 CREATE INDEX "idx_syncWakeEvents_babyID_date"
                 ON "syncWakeEvents"("babyID", "date")
             """).execute(db)
+        }
+
+        migrator.registerMigration("Compress oversized baby photos") { db in
+            let rows = try Row.fetchAll(db, sql: """
+                SELECT "id", "photoData" FROM "syncBabies"
+                WHERE "photoData" IS NOT NULL AND LENGTH("photoData") > 500000
+            """)
+            for row in rows {
+                let id: String = row["id"]
+                let data: Data = row["photoData"]
+                if let compressed = ImageUtilities.resizeForProfile(data: data) {
+                    try db.execute(
+                        sql: """
+                            UPDATE "syncBabies" SET "photoData" = ? WHERE "id" = ?
+                        """,
+                        arguments: [compressed, id]
+                    )
+                }
+            }
         }
 
         try migrator.migrate(database)

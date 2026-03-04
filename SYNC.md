@@ -205,7 +205,7 @@ Last-write-wins is acceptable (wake time is the same either way).
 - `-skipMacroValidation` is required — the project uses SPM macro packages
   (StructuredQueries, Perception) that won't compile without it
 - DayEngine tests are pure-functional and don't touch the database
-- 133 tests across 31 suites, runs in <2 seconds
+- 144 tests across 34 suites, runs in ~1 second
 
 ## Migration State
 
@@ -217,8 +217,36 @@ Last-write-wins is acceptable (wake time is the same either way).
 | 4. Test migration | **Complete** | 109 tests across 22 suites passing |
 | 4a. SwiftData → SQLite data migration | **Complete** | One-time first-launch migration via GRDB raw SQL; idempotent via UserDefaults flag |
 | 5. CloudKit private sync | **Complete** | SyncEngine init, SyncDelegate, DatabaseRegionObservation, WakeEvent unique constraint, autoClose deviceID filter |
-| 6. CloudKit sharing (CKShare) | Not started | Depends on Phase 5 |
+| 6. CloudKit sharing (CKShare) | **Complete** | AppDelegate/SceneDelegate for share acceptance, CloudSharingView in Settings, SyncMetadata sharing queries, auto-select on accept |
 | 7. Polish (migration, cleanup, sync UI) | Not started | Depends on Phase 6 |
+
+## CloudKit Sharing (Phase 6)
+
+### Share Acceptance (AppDelegate + SceneDelegate)
+BabyTimeApp uses `@UIApplicationDelegateAdaptor(AppDelegate.self)`. The AppDelegate
+provides a scene configuration with `SceneDelegate` which handles:
+- `windowScene(_:userDidAcceptCloudKitShareWith:)` — share link while app is running
+- `scene(_:willConnectTo:options:)` — cold launch from share link
+
+Both call `syncEngine.acceptShare(metadata:)` and post `.didAcceptCloudKitShare`
+notification. ContentView listens for this notification and auto-selects the newly
+shared baby.
+
+### Sharing UI (SettingsView)
+The Settings screen has a "Sharing" card:
+- **Not shared:** "Share with Family" button → calls `syncEngine.share(record:baby)`
+  → presents `CloudSharingView` sheet
+- **Shared:** Shows participant count + "Manage" button → opens `CloudSharingView`
+
+### Sharing Status (SyncMetadata)
+`ActivityManager.isBabyShared(_:)` and `shareParticipantCount(_:)` query
+`SyncMetadata` via `baby.syncMetadataID`. These work only when the metadata
+database is attached (production), not in test databases.
+
+### Info.plist
+`INFOPLIST_KEY_CKSharingSupported = YES` build setting injects `CKSharingSupported`
+into the generated Info.plist, telling iOS this app can accept CloudKit share
+invitations.
 
 ## Files Involved
 
@@ -231,8 +259,9 @@ Last-write-wins is acceptable (wake time is the same either way).
 - `BabyTimeTests/SwiftDataMigrationTests.swift` — migration logic tests
 
 ### Application layer
-- `BabyTime/Models/ActivityManager.swift` — all persistence via `DatabaseWriter`
-- `BabyTime/BabyTimeApp.swift` — `prepareDependencies` bootstrap
+- `BabyTime/Models/ActivityManager.swift` — all persistence via `DatabaseWriter` + sharing queries
+- `BabyTime/BabyTimeApp.swift` — `prepareDependencies` bootstrap + `@UIApplicationDelegateAdaptor`
+- `BabyTime/AppDelegate.swift` — AppDelegate + SceneDelegate for CKShare acceptance
 
 ### Pure logic (no database dependency)
 - `BabyTime/Engine/DayEngine.swift` — pure functions

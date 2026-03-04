@@ -5,12 +5,22 @@
 //  Settings: baby info, schedule, baby list, add/delete.
 //
 
-import SwiftUI
+import CloudKit
+import Dependencies
 import PhotosUI
+import SQLiteData
+import SwiftUI
 
 struct SettingsView: View {
     @Environment(ActivityManager.self) private var activityManager
     @Environment(\.dismiss) private var dismiss
+    @State private var sharedRecord: SharedRecord?
+    @State private var shareError: String?
+    @State private var showJoinShare = false
+    @State private var engineRunning = false
+    @State private var engineSyncing = false
+    @State private var engineSending = false
+    @State private var engineFetching = false
 
     var body: some View {
         NavigationStack {
@@ -19,6 +29,7 @@ struct SettingsView: View {
                     if let baby = activityManager.baby {
                         babyInfoCard(baby)
                         scheduleCard(baby)
+                        sharingCard(baby)
                     }
 
                     if activityManager.allBabies.count > 1 {
@@ -26,6 +37,8 @@ struct SettingsView: View {
                     }
 
                     addBabyButton
+                    joinShareButton
+                    syncDiagnosticsCard
                 }
                 .padding(.horizontal, BTSpacing.pageMargin)
                 .padding(.vertical, 20)
@@ -33,6 +46,20 @@ struct SettingsView: View {
             .background(Color.btBackground)
             .navigationTitle("Settings")
             .navigationBarTitleDisplayMode(.inline)
+            .sheet(item: $sharedRecord) { record in
+                CloudSharingView(sharedRecord: record)
+            }
+            .alert("Sharing Error", isPresented: Binding(
+                get: { shareError != nil },
+                set: { if !$0 { shareError = nil } }
+            )) {
+                Button("OK", role: .cancel) { }
+            } message: {
+                Text(shareError ?? "")
+            }
+            .sheet(isPresented: $showJoinShare) {
+                JoinShareView()
+            }
         }
     }
 
@@ -131,6 +158,177 @@ struct SettingsView: View {
         .background(Color.btBackground)
         .clipShape(RoundedRectangle(cornerRadius: BTRadius.card, style: .continuous))
         .cardShadow()
+    }
+
+    // MARK: - Sharing Card
+
+    private func sharingCard(_ baby: Baby) -> some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text("Sharing")
+                .font(BTTypography.photoDate)
+                .tracking(BTTracking.photoDate)
+                .foregroundStyle(Color.btTextPrimary)
+
+            if activityManager.isBabyShared(baby) {
+                let count = activityManager.shareParticipantCount(baby)
+                HStack {
+                    Text("Shared with \(count) caregiver\(count == 1 ? "" : "s")")
+                        .font(BTTypography.label)
+                        .tracking(BTTracking.label)
+                        .foregroundStyle(Color.btTextSecondary)
+
+                    Spacer()
+
+                    Button("Manage") {
+                        openManageSharing(baby)
+                    }
+                    .font(BTTypography.label)
+                    .tracking(BTTracking.label)
+                    .foregroundStyle(Color.btFeedAccent)
+                }
+            } else {
+                Button {
+                    startSharing(baby)
+                } label: {
+                    HStack {
+                        Image(systemName: "person.badge.plus")
+                        Text("Share with Family")
+                    }
+                    .font(BTTypography.label)
+                    .tracking(BTTracking.label)
+                    .foregroundStyle(Color.btFeedAccent)
+                }
+            }
+        }
+        .padding(.top, BTSpacing.cardPaddingTop)
+        .padding(.horizontal, BTSpacing.cardPaddingHorizontal)
+        .padding(.bottom, BTSpacing.cardPaddingBottom)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.btBackground)
+        .clipShape(RoundedRectangle(cornerRadius: BTRadius.card, style: .continuous))
+        .cardShadow()
+    }
+
+    private func startSharing(_ baby: Baby) {
+        Task {
+            do {
+                @Dependency(\.defaultSyncEngine) var syncEngine
+                sharedRecord = try await syncEngine.share(record: baby) { share in
+                    share[CKShare.SystemFieldKey.title] = "\(baby.name)'s BabyTime"
+                    if let photoData = baby.photoData,
+                       let thumbnail = ImageUtilities.resizeForProfile(
+                           data: photoData, maxDimension: 256, quality: 0.5
+                       ) {
+                        share[CKShare.SystemFieldKey.thumbnailImageData] = thumbnail
+                    }
+                }
+            } catch {
+                shareError = "Share failed: \(error)"
+            }
+        }
+    }
+
+    private func openManageSharing(_ baby: Baby) {
+        Task {
+            do {
+                @Dependency(\.defaultSyncEngine) var syncEngine
+                sharedRecord = try await syncEngine.share(record: baby) { _ in }
+            } catch {
+                shareError = "Manage sharing failed: \(error)"
+            }
+        }
+    }
+
+    // MARK: - Join Shared Baby
+
+    private var joinShareButton: some View {
+        Button {
+            showJoinShare = true
+        } label: {
+            HStack {
+                Image(systemName: "person.crop.circle.badge.plus")
+                Text("Join Shared Baby")
+            }
+            .font(BTTypography.label)
+            .tracking(BTTracking.label)
+            .foregroundStyle(Color.btFeedAccent)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 16)
+            .background(Color.btBackground)
+            .clipShape(RoundedRectangle(cornerRadius: BTRadius.card, style: .continuous))
+            .cardShadow()
+        }
+    }
+
+    // MARK: - Sync Diagnostics
+
+    private var syncDiagnosticsCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Text("Sync Diagnostics")
+                    .font(BTTypography.photoDate)
+                    .tracking(BTTracking.photoDate)
+                    .foregroundStyle(Color.btTextPrimary)
+
+                Spacer()
+
+                Button {
+                    refreshDiagnostics()
+                } label: {
+                    Image(systemName: "arrow.clockwise")
+                        .foregroundStyle(Color.btFeedAccent)
+                }
+            }
+
+            diagnosticRow("Engine", value: engineRunning ? "Running" : "Stopped")
+            diagnosticRow("Syncing", value: engineSyncing ? "Yes" : "No")
+            diagnosticRow("Sending", value: engineSending ? "Yes" : "No")
+            diagnosticRow("Fetching", value: engineFetching ? "Yes" : "No")
+
+            Divider()
+                .foregroundStyle(Color.btDivider)
+
+            ForEach(activityManager.allBabies, id: \.stableID) { baby in
+                let hasServer = activityManager.hasSyncServerRecord(baby)
+                let shared = activityManager.isBabyShared(baby)
+                diagnosticRow(
+                    baby.name.isEmpty ? "Unnamed" : baby.name,
+                    value: hasServer ? (shared ? "Synced + Shared" : "Synced") : "Local Only"
+                )
+            }
+        }
+        .padding(.top, BTSpacing.cardPaddingTop)
+        .padding(.horizontal, BTSpacing.cardPaddingHorizontal)
+        .padding(.bottom, BTSpacing.cardPaddingBottom)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.btBackground)
+        .clipShape(RoundedRectangle(cornerRadius: BTRadius.card, style: .continuous))
+        .cardShadow()
+        .task { refreshDiagnostics() }
+    }
+
+    private func diagnosticRow(_ label: String, value: String) -> some View {
+        HStack {
+            Text(label)
+                .font(BTTypography.label)
+                .tracking(BTTracking.label)
+                .foregroundStyle(Color.btTextSecondary)
+            Spacer()
+            Text(value)
+                .font(BTTypography.label)
+                .tracking(BTTracking.label)
+                .foregroundStyle(value == "Local Only" || value == "Stopped" ? Color.orange : Color.btTextPrimary)
+        }
+    }
+
+    private func refreshDiagnostics() {
+        Task { @MainActor in
+            @Dependency(\.defaultSyncEngine) var syncEngine
+            engineRunning = syncEngine.isRunning
+            engineSyncing = syncEngine.isSynchronizing
+            engineSending = syncEngine.isSendingChanges
+            engineFetching = syncEngine.isFetchingChanges
+        }
     }
 
     // MARK: - Baby Selector
@@ -322,6 +520,7 @@ struct AddBabyView: View {
 
 struct WelcomeView: View {
     @Environment(ActivityManager.self) private var activityManager
+    @AppStorage("selectedBabyID") private var selectedBabyID: String?
 
     @State private var name = "Kaia"
     @State private var birthdate = Calendar.current.date(
@@ -436,6 +635,7 @@ struct WelcomeView: View {
                     photoData: photoData
                 )
                 activityManager.selectBaby(baby)
+                selectedBabyID = baby.stableID
             } label: {
                 Text("Get Started")
                     .font(BTTypography.label)

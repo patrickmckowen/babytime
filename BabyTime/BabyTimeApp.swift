@@ -12,6 +12,7 @@ import UserNotifications
 
 @main
 struct BabyTimeApp: App {
+    @UIApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @State private var activityManager: ActivityManager
     @State private var syncDelegate: SyncDelegate?
     @Environment(\.scenePhase) private var scenePhase
@@ -21,18 +22,17 @@ struct BabyTimeApp: App {
         let manager: ActivityManager
         if ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] != nil {
             // Tests: in-memory DB, no SyncEngine
-            manager = withDependencies {
+            prepareDependencies {
                 try! $0.bootstrapTestDatabase()
-            } operation: {
-                @Dependency(\.defaultDatabase) var database
-                return ActivityManager(database: database)
             }
+            @Dependency(\.defaultDatabase) var testDatabase
+            manager = ActivityManager(database: testDatabase)
             self._activityManager = State(initialValue: manager)
             self._syncDelegate = State(initialValue: nil)
         } else {
             // Production: database + SyncEngine
             let delegate = SyncDelegate()
-            manager = withDependencies {
+            prepareDependencies {
                 try! $0.bootstrapDatabase()
                 $0.defaultSyncEngine = try! SyncEngine(
                     for: $0.defaultDatabase,
@@ -40,10 +40,9 @@ struct BabyTimeApp: App {
                     containerIdentifier: "iCloud.com.patrickmckowen.BabyTime",
                     delegate: delegate
                 )
-            } operation: {
-                @Dependency(\.defaultDatabase) var database
-                return ActivityManager(database: database)
             }
+            @Dependency(\.defaultDatabase) var database
+            manager = ActivityManager(database: database)
             self._activityManager = State(initialValue: manager)
             self._syncDelegate = State(initialValue: delegate)
         }

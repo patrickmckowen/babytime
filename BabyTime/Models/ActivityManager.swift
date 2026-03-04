@@ -6,11 +6,15 @@
 //  Persists active timers immediately for multi-device sync + crash recovery.
 //
 
+import CloudKit
 import Foundation
 import GRDB
+import os
 import SwiftUI
 import SQLiteData
 import UserNotifications
+
+private let logger = Logger(subsystem: "com.patrickmckowen.BabyTime", category: "ActivityManager")
 
 @Observable
 final class ActivityManager {
@@ -97,17 +101,34 @@ final class ActivityManager {
             photoData: photoData,
             createdAt: Date()
         )
-        try? database.write { db in
-            try Baby.insert { baby }.execute(db)
+        do {
+            try database.write { db in
+                try Baby.insert { baby }.execute(db)
+            }
+        } catch {
+            logger.error("addBaby failed: \(error)")
         }
+
+        // Verify persistence — if this is nil, the INSERT silently failed
+        let verified = try? database.read { db in
+            try Baby.find(baby.id).fetchOne(db)
+        }
+        if verified == nil {
+            logger.error("addBaby: Baby NOT found in DB after insert! id=\(baby.id)")
+        }
+
         loadBabies()
         return baby
     }
 
     func deleteBaby(_ baby: Baby) {
         let wasSelected = self.baby?.stableID == baby.stableID
-        try? database.write { db in
-            try Baby.find(baby.id).delete().execute(db)
+        do {
+            try database.write { db in
+                try Baby.find(baby.id).delete().execute(db)
+            }
+        } catch {
+            logger.error("deleteBaby failed: \(error)")
         }
         loadBabies()
         if wasSelected {
@@ -224,7 +245,7 @@ final class ActivityManager {
     private func autoCloseStaleEvents() {
         guard let baby else { return }
 
-        try? database.write { db in
+        do { try database.write { db in
             let staleThreshold = Date().addingTimeInterval(-48 * 60 * 60)
             let staleSleeps = try SleepEvent
                 .where { $0.babyID.eq(#bind(baby.id)) && $0.isNightSleep.eq(true) && $0.endTime.is(nil) && $0.startTime < #bind(staleThreshold) }
@@ -273,6 +294,9 @@ final class ActivityManager {
                 }
             }
         }
+        } catch {
+            logger.error("autoCloseStaleEvents failed: \(error)")
+        }
     }
 
     // MARK: - Nursing Actions
@@ -288,8 +312,12 @@ final class ActivityManager {
             caregiverName: DeviceIdentity.caregiverName,
             deviceID: DeviceIdentity.deviceID
         )
-        try? database.write { db in
-            try FeedEvent.insert { event }.execute(db)
+        do {
+            try database.write { db in
+                try FeedEvent.insert { event }.execute(db)
+            }
+        } catch {
+            logger.error("startNursing failed: \(error)")
         }
         activeNursingEvent = event
         refresh()
@@ -297,10 +325,14 @@ final class ActivityManager {
 
     func resumeNursing() {
         guard let event = activeNursingEvent else { return }
-        try? database.write { db in
-            try FeedEvent.find(event.id)
-                .update { $0.endTime = #bind(nil as Date?) }
-                .execute(db)
+        do {
+            try database.write { db in
+                try FeedEvent.find(event.id)
+                    .update { $0.endTime = #bind(nil as Date?) }
+                    .execute(db)
+            }
+        } catch {
+            logger.error("resumeNursing failed: \(error)")
         }
         activeNursingEvent?.endTime = nil
         refresh()
@@ -309,10 +341,14 @@ final class ActivityManager {
     func stopNursing() {
         guard let event = activeNursingEvent, event.isActive else { return }
         let now = Date()
-        try? database.write { db in
-            try FeedEvent.find(event.id)
-                .update { $0.endTime = #bind(now) }
-                .execute(db)
+        do {
+            try database.write { db in
+                try FeedEvent.find(event.id)
+                    .update { $0.endTime = #bind(now) }
+                    .execute(db)
+            }
+        } catch {
+            logger.error("stopNursing failed: \(error)")
         }
         activeNursingEvent?.endTime = now
         refresh()
@@ -320,8 +356,12 @@ final class ActivityManager {
 
     func resetNursing() {
         if let event = activeNursingEvent {
-            try? database.write { db in
-                try FeedEvent.find(event.id).delete().execute(db)
+            do {
+                try database.write { db in
+                    try FeedEvent.find(event.id).delete().execute(db)
+                }
+            } catch {
+                logger.error("resetNursing failed: \(error)")
             }
         }
         activeNursingEvent = nil
@@ -330,25 +370,29 @@ final class ActivityManager {
 
     func saveNursing() {
         guard let event = activeNursingEvent else { return }
-        if event.isActive {
-            let now = Date()
-            try? database.write { db in
-                try FeedEvent.find(event.id)
-                    .update { $0.endTime = #bind(now) }
-                    .execute(db)
+        do {
+            if event.isActive {
+                let now = Date()
+                try database.write { db in
+                    try FeedEvent.find(event.id)
+                        .update { $0.endTime = #bind(now) }
+                        .execute(db)
+                }
+            } else {
+                // Persist any user edits to start/end times
+                let startTime = event.startTime
+                let endTime = event.endTime
+                try database.write { db in
+                    try FeedEvent.find(event.id)
+                        .update {
+                            $0.startTime = #bind(startTime)
+                            $0.endTime = #bind(endTime)
+                        }
+                        .execute(db)
+                }
             }
-        } else {
-            // Persist any user edits to start/end times
-            let startTime = event.startTime
-            let endTime = event.endTime
-            try? database.write { db in
-                try FeedEvent.find(event.id)
-                    .update {
-                        $0.startTime = #bind(startTime)
-                        $0.endTime = #bind(endTime)
-                    }
-                    .execute(db)
-            }
+        } catch {
+            logger.error("saveNursing failed: \(error)")
         }
         activeNursingEvent = nil
         refresh()
@@ -366,8 +410,12 @@ final class ActivityManager {
             caregiverName: DeviceIdentity.caregiverName,
             deviceID: DeviceIdentity.deviceID
         )
-        try? database.write { db in
-            try FeedEvent.insert { event }.execute(db)
+        do {
+            try database.write { db in
+                try FeedEvent.insert { event }.execute(db)
+            }
+        } catch {
+            logger.error("saveNursingManual failed: \(error)")
         }
         activeNursingEvent = nil
         refresh()
@@ -388,8 +436,12 @@ final class ActivityManager {
             caregiverName: DeviceIdentity.caregiverName,
             deviceID: DeviceIdentity.deviceID
         )
-        try? database.write { db in
-            try FeedEvent.insert { event }.execute(db)
+        do {
+            try database.write { db in
+                try FeedEvent.insert { event }.execute(db)
+            }
+        } catch {
+            logger.error("saveBottle failed: \(error)")
         }
         refresh()
     }
@@ -405,8 +457,12 @@ final class ActivityManager {
             caregiverName: DeviceIdentity.caregiverName,
             deviceID: DeviceIdentity.deviceID
         )
-        try? database.write { db in
-            try SleepEvent.insert { event }.execute(db)
+        do {
+            try database.write { db in
+                try SleepEvent.insert { event }.execute(db)
+            }
+        } catch {
+            logger.error("startSleep failed: \(error)")
         }
         activeSleepEvent = event
         refresh()
@@ -414,10 +470,14 @@ final class ActivityManager {
 
     func resumeSleep() {
         guard let event = activeSleepEvent else { return }
-        try? database.write { db in
-            try SleepEvent.find(event.id)
-                .update { $0.endTime = #bind(nil as Date?) }
-                .execute(db)
+        do {
+            try database.write { db in
+                try SleepEvent.find(event.id)
+                    .update { $0.endTime = #bind(nil as Date?) }
+                    .execute(db)
+            }
+        } catch {
+            logger.error("resumeSleep failed: \(error)")
         }
         activeSleepEvent?.endTime = nil
         refresh()
@@ -426,10 +486,14 @@ final class ActivityManager {
     func stopSleep() {
         guard let event = activeSleepEvent, event.isActive else { return }
         let now = Date()
-        try? database.write { db in
-            try SleepEvent.find(event.id)
-                .update { $0.endTime = #bind(now) }
-                .execute(db)
+        do {
+            try database.write { db in
+                try SleepEvent.find(event.id)
+                    .update { $0.endTime = #bind(now) }
+                    .execute(db)
+            }
+        } catch {
+            logger.error("stopSleep failed: \(error)")
         }
         activeSleepEvent?.endTime = now
         refresh()
@@ -437,8 +501,12 @@ final class ActivityManager {
 
     func resetSleep() {
         if let event = activeSleepEvent {
-            try? database.write { db in
-                try SleepEvent.find(event.id).delete().execute(db)
+            do {
+                try database.write { db in
+                    try SleepEvent.find(event.id).delete().execute(db)
+                }
+            } catch {
+                logger.error("resetSleep failed: \(error)")
             }
         }
         activeSleepEvent = nil
@@ -447,25 +515,29 @@ final class ActivityManager {
 
     func saveSleep() {
         guard let event = activeSleepEvent else { return }
-        if event.isActive {
-            let now = Date()
-            try? database.write { db in
-                try SleepEvent.find(event.id)
-                    .update { $0.endTime = #bind(now) }
-                    .execute(db)
+        do {
+            if event.isActive {
+                let now = Date()
+                try database.write { db in
+                    try SleepEvent.find(event.id)
+                        .update { $0.endTime = #bind(now) }
+                        .execute(db)
+                }
+            } else {
+                // Persist any user edits to start/end times
+                let startTime = event.startTime
+                let endTime = event.endTime
+                try database.write { db in
+                    try SleepEvent.find(event.id)
+                        .update {
+                            $0.startTime = #bind(startTime)
+                            $0.endTime = #bind(endTime)
+                        }
+                        .execute(db)
+                }
             }
-        } else {
-            // Persist any user edits to start/end times
-            let startTime = event.startTime
-            let endTime = event.endTime
-            try? database.write { db in
-                try SleepEvent.find(event.id)
-                    .update {
-                        $0.startTime = #bind(startTime)
-                        $0.endTime = #bind(endTime)
-                    }
-                    .execute(db)
-            }
+        } catch {
+            logger.error("saveSleep failed: \(error)")
         }
         activeSleepEvent = nil
         refresh()
@@ -481,8 +553,12 @@ final class ActivityManager {
             caregiverName: DeviceIdentity.caregiverName,
             deviceID: DeviceIdentity.deviceID
         )
-        try? database.write { db in
-            try SleepEvent.insert { event }.execute(db)
+        do {
+            try database.write { db in
+                try SleepEvent.insert { event }.execute(db)
+            }
+        } catch {
+            logger.error("saveSleepManual failed: \(error)")
         }
         activeSleepEvent = nil
         refresh()
@@ -589,8 +665,12 @@ final class ActivityManager {
         if activeNursingEvent?.id == event.id {
             activeNursingEvent = nil
         }
-        try? database.write { db in
-            try FeedEvent.find(event.id).delete().execute(db)
+        do {
+            try database.write { db in
+                try FeedEvent.find(event.id).delete().execute(db)
+            }
+        } catch {
+            logger.error("deleteFeedEvent failed: \(error)")
         }
         refresh()
     }
@@ -599,8 +679,12 @@ final class ActivityManager {
         if activeSleepEvent?.id == event.id {
             activeSleepEvent = nil
         }
-        try? database.write { db in
-            try SleepEvent.find(event.id).delete().execute(db)
+        do {
+            try database.write { db in
+                try SleepEvent.find(event.id).delete().execute(db)
+            }
+        } catch {
+            logger.error("deleteSleepEvent failed: \(error)")
         }
         refresh()
     }
@@ -608,39 +692,51 @@ final class ActivityManager {
     // MARK: - Update Events
 
     func updateFeedEvent(_ event: FeedEvent, amountOz: Double, at time: Date) {
-        try? database.write { db in
-            try FeedEvent.find(event.id)
-                .update {
-                    $0.startTime = #bind(time)
-                    $0.endTime = #bind(time)
-                    $0.amountOz = #bind(amountOz)
-                }
-                .execute(db)
+        do {
+            try database.write { db in
+                try FeedEvent.find(event.id)
+                    .update {
+                        $0.startTime = #bind(time)
+                        $0.endTime = #bind(time)
+                        $0.amountOz = #bind(amountOz)
+                    }
+                    .execute(db)
+            }
+        } catch {
+            logger.error("updateFeedEvent failed: \(error)")
         }
         refresh()
     }
 
     func updateNursingEvent(_ event: FeedEvent, startTime: Date, endTime: Date, side: NursingSide) {
-        try? database.write { db in
-            try FeedEvent.find(event.id)
-                .update {
-                    $0.startTime = #bind(startTime)
-                    $0.endTime = #bind(endTime)
-                    $0.nursingSide = #bind(side)
-                }
-                .execute(db)
+        do {
+            try database.write { db in
+                try FeedEvent.find(event.id)
+                    .update {
+                        $0.startTime = #bind(startTime)
+                        $0.endTime = #bind(endTime)
+                        $0.nursingSide = #bind(side)
+                    }
+                    .execute(db)
+            }
+        } catch {
+            logger.error("updateNursingEvent failed: \(error)")
         }
         refresh()
     }
 
     func updateSleepEvent(_ event: SleepEvent, startTime: Date, endTime: Date) {
-        try? database.write { db in
-            try SleepEvent.find(event.id)
-                .update {
-                    $0.startTime = #bind(startTime)
-                    $0.endTime = #bind(endTime)
-                }
-                .execute(db)
+        do {
+            try database.write { db in
+                try SleepEvent.find(event.id)
+                    .update {
+                        $0.startTime = #bind(startTime)
+                        $0.endTime = #bind(endTime)
+                    }
+                    .execute(db)
+            }
+        } catch {
+            logger.error("updateSleepEvent failed: \(error)")
         }
         refresh()
     }
@@ -651,20 +747,24 @@ final class ActivityManager {
         guard let baby else { return }
         let today = Calendar.current.startOfDay(for: time)
 
-        try? database.write { db in
-            let existing = try WakeEvent
-                .where { $0.babyID.eq(#bind(baby.id)) && $0.date.eq(#bind(today)) }
-                .fetchOne(db)
+        do {
+            try database.write { db in
+                let existing = try WakeEvent
+                    .where { $0.babyID.eq(#bind(baby.id)) && $0.date.eq(#bind(today)) }
+                    .fetchOne(db)
 
-            if let existing {
-                try WakeEvent.find(existing.id)
-                    .update { $0.time = #bind(time) }
-                    .execute(db)
-            } else {
-                try WakeEvent.insert {
-                    WakeEvent.create(babyID: baby.id, time: time)
-                }.execute(db)
+                if let existing {
+                    try WakeEvent.find(existing.id)
+                        .update { $0.time = #bind(time) }
+                        .execute(db)
+                } else {
+                    try WakeEvent.insert {
+                        WakeEvent.create(babyID: baby.id, time: time)
+                    }.execute(db)
+                }
             }
+        } catch {
+            logger.error("setWakeTime failed: \(error)")
         }
         refresh()
     }
@@ -685,18 +785,26 @@ final class ActivityManager {
             caregiverName: DeviceIdentity.caregiverName,
             deviceID: DeviceIdentity.deviceID
         )
-        try? database.write { db in
-            try SleepEvent.insert { event }.execute(db)
+        do {
+            try database.write { db in
+                try SleepEvent.insert { event }.execute(db)
+            }
+        } catch {
+            logger.error("logBedtime failed: \(error)")
         }
         refresh()
     }
 
     func logWakeUp(at time: Date) {
         guard let nightSleep = activeNightSleep else { return }
-        try? database.write { db in
-            try SleepEvent.find(nightSleep.id)
-                .update { $0.endTime = #bind(time) }
-                .execute(db)
+        do {
+            try database.write { db in
+                try SleepEvent.find(nightSleep.id)
+                    .update { $0.endTime = #bind(time) }
+                    .execute(db)
+            }
+        } catch {
+            logger.error("logWakeUp failed: \(error)")
         }
 
         let hour = Calendar.current.component(.hour, from: time)
@@ -709,10 +817,14 @@ final class ActivityManager {
 
     func updateBedtime(_ time: Date) {
         guard let nightSleep = activeNightSleep ?? todayNightSleep else { return }
-        try? database.write { db in
-            try SleepEvent.find(nightSleep.id)
-                .update { $0.startTime = #bind(time) }
-                .execute(db)
+        do {
+            try database.write { db in
+                try SleepEvent.find(nightSleep.id)
+                    .update { $0.startTime = #bind(time) }
+                    .execute(db)
+            }
+        } catch {
+            logger.error("updateBedtime failed: \(error)")
         }
         refresh()
     }
@@ -907,20 +1019,24 @@ final class ActivityManager {
     func updateBaby(_ changes: (inout Baby) -> Void) {
         guard var baby else { return }
         changes(&baby)
-        try? database.write { db in
-            try Baby.find(baby.id)
-                .update {
-                    $0.name = #bind(baby.name)
-                    $0.birthdate = #bind(baby.birthdate)
-                    $0.bedtimeHour = #bind(baby.bedtimeHour)
-                    $0.bedtimeMinute = #bind(baby.bedtimeMinute)
-                    $0.dreamFeedEnabled = #bind(baby.dreamFeedEnabled)
-                    $0.dreamFeedHour = #bind(baby.dreamFeedHour)
-                    $0.dreamFeedMinute = #bind(baby.dreamFeedMinute)
-                    $0.customFeedIntervalMinutes = #bind(baby.customFeedIntervalMinutes)
-                    $0.photoData = #bind(baby.photoData)
-                }
-                .execute(db)
+        do {
+            try database.write { db in
+                try Baby.find(baby.id)
+                    .update {
+                        $0.name = #bind(baby.name)
+                        $0.birthdate = #bind(baby.birthdate)
+                        $0.bedtimeHour = #bind(baby.bedtimeHour)
+                        $0.bedtimeMinute = #bind(baby.bedtimeMinute)
+                        $0.dreamFeedEnabled = #bind(baby.dreamFeedEnabled)
+                        $0.dreamFeedHour = #bind(baby.dreamFeedHour)
+                        $0.dreamFeedMinute = #bind(baby.dreamFeedMinute)
+                        $0.customFeedIntervalMinutes = #bind(baby.customFeedIntervalMinutes)
+                        $0.photoData = #bind(baby.photoData)
+                    }
+                    .execute(db)
+            }
+        } catch {
+            logger.error("updateBaby failed: \(error)")
         }
         self.baby = baby
     }
@@ -1024,5 +1140,33 @@ final class ActivityManager {
         guard feedCount > 0 else { return "--" }
         let avg = totalIntakeOz / Double(feedCount)
         return String(format: "%.1f oz", avg)
+    }
+
+    // MARK: - Sharing (Phase 6)
+
+    func shareForBaby(_ baby: Baby) -> CKShare? {
+        try? database.read { db in
+            try SyncMetadata
+                .find(baby.syncMetadataID)
+                .select(\.share)
+                .fetchOne(db)
+        } ?? nil
+    }
+
+    func isBabyShared(_ baby: Baby) -> Bool {
+        shareForBaby(baby) != nil
+    }
+
+    func shareParticipantCount(_ baby: Baby) -> Int {
+        guard let share = shareForBaby(baby) else { return 0 }
+        return share.participants.count
+    }
+
+    func hasSyncServerRecord(_ baby: Baby) -> Bool {
+        (try? database.read { db in
+            try SyncMetadata
+                .find(baby.syncMetadataID)
+                .fetchOne(db)
+        })?.hasLastKnownServerRecord ?? false
     }
 }

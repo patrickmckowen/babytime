@@ -20,11 +20,12 @@ sharing between different iCloud accounts.
 
 ## Migration Approach
 
-The migration from SwiftData to SQLiteData is phased. Phases 1-2 are
-complete: the old SwiftData `@Model` classes have been removed and the
-`@Table` structs are now the canonical types (`Baby`, `FeedEvent`,
-`SleepEvent`, `WakeEvent`). The SQLite tables retain the `sync` prefix
-(e.g. `syncBabies`) for future CloudKit compatibility.
+The migration from SwiftData to SQLiteData is phased. Phases 1–6 are
+complete: the old SwiftData `@Model` classes have been removed, the
+`@Table` structs are the canonical types (`Baby`, `FeedEvent`,
+`SleepEvent`, `WakeEvent`), CloudKit private sync is live, and
+CloudKit sharing (CKShare) is fully implemented. The SQLite tables
+retain the `sync` prefix (e.g. `syncBabies`) for CloudKit compatibility.
 
 ## Schema
 
@@ -45,7 +46,7 @@ Baby  (table: syncBabies)
 ├── dreamFeedHour: Int
 ├── dreamFeedMinute: Int
 ├── customFeedIntervalMinutes: Int
-├── photoData: Data? (@Column(.externalData) → CKAsset)
+├── photoData: Data?
 └── createdAt: Date
 
 FeedEvent  (table: syncFeedEvents)
@@ -88,12 +89,12 @@ Baby 1──* WakeEvent   (via babyID, cascade delete)
 
 ### Enums
 
-SQLiteData supports `RawRepresentable` enums directly — no String
-intermediary needed.
+Enums conform to `String, QueryBindable, CaseIterable, Sendable`.
+SQLiteData stores the raw `String` value directly — no intermediary needed.
 
-- `FeedKind: String` — `bottle`, `nursing`
-- `BottleSource: String` — `breastMilk`, `formula`
-- `NursingSide: String` — `left`, `right`, `both`
+- `FeedKind` — `bottle`, `nursing`
+- `BottleSource` — `breastMilk`, `formula`
+- `NursingSide` — `left`, `right`, `both`
 
 ## Multi-Writer Identity
 
@@ -130,12 +131,16 @@ sync order.
 
 ### Sharing Flow
 ```
-Mom creates Baby → Baby is in Mom's private zone
-Mom taps "Share" → SyncEngine creates CKShare
-  → UICloudSharingController presents invite
-  → Mom sends invite via iMessage/email
-Dad accepts → SyncEngine discovers shared zone
-  → Baby + all events sync to Dad's device
+Owner creates Baby → Baby is in owner's private zone
+Owner taps "Share" → syncEngine.share(record:baby)
+  → CloudSharingView sheet (SQLiteData) presents invite
+  → Owner sends invite via iMessage/email
+Recipient accepts via:
+  (a) OS share link → SceneDelegate → syncEngine.acceptShare(metadata:)
+  (b) In-app "Join Shared Baby" → pastes URL → JoinShareView
+      → CKFetchShareMetadataOperation → syncEngine.acceptShare(metadata:)
+  → Baby + all events sync to recipient's device
+  → ContentView auto-selects the newly shared baby
 ```
 
 ## Active Event Discovery
@@ -217,8 +222,8 @@ Last-write-wins is acceptable (wake time is the same either way).
 | 4. Test migration | **Complete** | 109 tests across 22 suites passing |
 | 4a. SwiftData → SQLite data migration | **Complete** | One-time first-launch migration via GRDB raw SQL; idempotent via UserDefaults flag |
 | 5. CloudKit private sync | **Complete** | SyncEngine init, SyncDelegate, DatabaseRegionObservation, WakeEvent unique constraint, autoClose deviceID filter |
-| 6. CloudKit sharing (CKShare) | **Complete** | AppDelegate/SceneDelegate for share acceptance, CloudSharingView in Settings, SyncMetadata sharing queries, auto-select on accept |
-| 7. Polish (migration, cleanup, sync UI) | Not started | Depends on Phase 6 |
+| 6. CloudKit sharing (CKShare) | **Complete** | AppDelegate/SceneDelegate for share acceptance, CloudSharingView in Settings, JoinShareView for in-app URL acceptance, SyncMetadata sharing queries, sync diagnostics, auto-select on accept |
+| 7. Polish (migration, cleanup, sync UI) | Not started | |
 
 ## CloudKit Sharing (Phase 6)
 
@@ -235,13 +240,25 @@ shared baby.
 ### Sharing UI (SettingsView)
 The Settings screen has a "Sharing" card:
 - **Not shared:** "Share with Family" button → calls `syncEngine.share(record:baby)`
-  → presents `CloudSharingView` sheet
+  → presents `CloudSharingView` sheet (from SQLiteData framework)
 - **Shared:** Shows participant count + "Manage" button → opens `CloudSharingView`
 
+A separate "Join Shared Baby" button opens `JoinShareView` — an in-app
+sheet where users paste an iCloud share URL. This bypasses iOS App Store
+URL routing issues by fetching share metadata directly via
+`CKFetchShareMetadataOperation` and calling `syncEngine.acceptShare(metadata:)`.
+
 ### Sharing Status (SyncMetadata)
-`ActivityManager.isBabyShared(_:)` and `shareParticipantCount(_:)` query
-`SyncMetadata` via `baby.syncMetadataID`. These work only when the metadata
-database is attached (production), not in test databases.
+`ActivityManager.isBabyShared(_:)`, `shareParticipantCount(_:)`, and
+`hasSyncServerRecord(_:)` query `SyncMetadata` via `baby.syncMetadataID`.
+These work only when the metadata database is attached (production), not
+in test databases.
+
+### Sync Diagnostics (SettingsView)
+A diagnostics card at the bottom of Settings shows real-time sync state:
+- **Engine status:** running, syncing, sending, fetching (via `SyncEngine` properties)
+- **Per-baby status:** "Local Only", "Synced", or "Synced + Shared" (via
+  `hasSyncServerRecord` and `isBabyShared`)
 
 ### Info.plist
 `INFOPLIST_KEY_CKSharingSupported = YES` build setting injects `CKSharingSupported`
@@ -262,12 +279,17 @@ invitations.
 - `BabyTime/Models/ActivityManager.swift` — all persistence via `DatabaseWriter` + sharing queries
 - `BabyTime/BabyTimeApp.swift` — `prepareDependencies` bootstrap + `@UIApplicationDelegateAdaptor`
 - `BabyTime/AppDelegate.swift` — AppDelegate + SceneDelegate for CKShare acceptance
+- `BabyTime/ContentView.swift` — `.didAcceptCloudKitShare` notification handler + baby auto-selection
+- `BabyTime/Views/JoinShareView.swift` — in-app share acceptance via pasted iCloud URL
+- `BabyTime/Views/SettingsView.swift` — sharing card, join button, sync diagnostics
+- `BabyTime/Notifications/NotificationManager.swift` — notification delivery + permission
+- `BabyTime/Notifications/NotificationScheduler.swift` — DaySnapshot → notification triggers
 
 ### Pure logic (no database dependency)
 - `BabyTime/Engine/DayEngine.swift` — pure functions
 - `BabyTime/Engine/AgeTable.swift` — pure data
+- `BabyTime/Engine/DayState.swift` — pure value types (DayState, FeedState, SyncConflict, DaySnapshot)
 - `BabyTime/Models/DeviceIdentity.swift` — UserDefaults only
-- `BabyTime/Models/DayState.swift` — pure value types
 
 ## StructuredQueries API Reference
 

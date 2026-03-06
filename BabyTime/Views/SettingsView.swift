@@ -21,6 +21,7 @@ struct SettingsView: View {
     @State private var engineSyncing = false
     @State private var engineSending = false
     @State private var engineFetching = false
+    @State private var babyToDelete: Baby?
 
     var body: some View {
         NavigationStack {
@@ -59,6 +60,9 @@ struct SettingsView: View {
             }
             .sheet(isPresented: $showJoinShare) {
                 JoinShareView()
+            }
+            .sheet(item: $babyToDelete) { baby in
+                deleteBabyConfirmation(baby)
             }
         }
     }
@@ -334,45 +338,145 @@ struct SettingsView: View {
     // MARK: - Baby Selector
 
     private var babySelectorCard: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: 0) {
             Text("Babies")
                 .font(BTTypography.photoDate)
                 .tracking(BTTracking.photoDate)
                 .foregroundStyle(Color.btTextPrimary)
+                .padding(.top, BTSpacing.cardPaddingTop)
+                .padding(.horizontal, BTSpacing.cardPaddingHorizontal)
+                .padding(.bottom, 8)
 
-            ForEach(activityManager.allBabies, id: \.stableID) { baby in
-                HStack {
-                    Text(baby.name.isEmpty ? "Unnamed" : baby.name)
-                        .font(BTTypography.label)
-                        .tracking(BTTracking.label)
-                        .foregroundStyle(Color.btTextPrimary)
+            List {
+                ForEach(activityManager.allBabies, id: \.stableID) { baby in
+                    HStack(spacing: 12) {
+                        babyAvatar(baby, size: 36)
 
-                    Spacer()
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(baby.name.isEmpty ? "Unnamed" : baby.name)
+                                .font(BTTypography.label)
+                                .tracking(BTTracking.label)
+                                .foregroundStyle(Color.btTextPrimary)
+                            Text(babySubtitle(baby))
+                                .font(.caption)
+                                .foregroundStyle(Color.btTextSecondary)
+                        }
 
-                    if baby.stableID == activityManager.baby?.stableID {
-                        Image(systemName: "checkmark")
-                            .foregroundStyle(Color.btFeedAccent)
-                            .fontWeight(.semibold)
+                        Spacer()
+
+                        if baby.stableID == activityManager.baby?.stableID {
+                            Image(systemName: "checkmark")
+                                .foregroundStyle(Color.btFeedAccent)
+                                .fontWeight(.semibold)
+                        }
                     }
-                }
-                .contentShape(Rectangle())
-                .onTapGesture {
-                    activityManager.selectBaby(baby)
-                }
-
-                if baby.stableID != activityManager.allBabies.last?.stableID {
-                    Divider()
-                        .foregroundStyle(Color.btDivider)
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        activityManager.selectBaby(baby)
+                    }
+                    .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                        Button(role: .destructive) {
+                            babyToDelete = baby
+                        } label: {
+                            Label("Delete", systemImage: "trash")
+                        }
+                    }
+                    .listRowBackground(Color.btBackground)
+                    .listRowSeparatorTint(Color.btDivider)
+                    .listRowInsets(EdgeInsets(
+                        top: 8,
+                        leading: BTSpacing.cardPaddingHorizontal,
+                        bottom: 8,
+                        trailing: BTSpacing.cardPaddingHorizontal
+                    ))
                 }
             }
+            .listStyle(.plain)
+            .scrollDisabled(true)
+            .scrollContentBackground(.hidden)
+            .frame(height: CGFloat(activityManager.allBabies.count) * 56)
         }
-        .padding(.top, BTSpacing.cardPaddingTop)
-        .padding(.horizontal, BTSpacing.cardPaddingHorizontal)
-        .padding(.bottom, BTSpacing.cardPaddingBottom)
-        .frame(maxWidth: .infinity, alignment: .leading)
         .background(Color.btBackground)
         .clipShape(RoundedRectangle(cornerRadius: BTRadius.card, style: .continuous))
         .cardShadow()
+    }
+
+    // MARK: - Baby Helpers
+
+    @ViewBuilder
+    private func babyAvatar(_ baby: Baby, size: CGFloat) -> some View {
+        if let photoData = baby.photoData, let uiImage = UIImage(data: photoData) {
+            Image(uiImage: uiImage)
+                .resizable()
+                .scaledToFill()
+                .frame(width: size, height: size)
+                .clipShape(RoundedRectangle(cornerRadius: size * 0.22, style: .continuous))
+        } else {
+            RoundedRectangle(cornerRadius: size * 0.22, style: .continuous)
+                .fill(Color.btPhotoPlaceholder)
+                .frame(width: size, height: size)
+                .overlay {
+                    Text(String((baby.name.isEmpty ? "?" : baby.name).prefix(1)).uppercased())
+                        .font(.system(size: size * 0.44, weight: .semibold))
+                        .foregroundStyle(Color.btTextMuted)
+                }
+        }
+    }
+
+    private func babySubtitle(_ baby: Baby) -> String {
+        let status = activityManager.isBabyShared(baby) ? "Shared" : "Local only"
+        return "\(status) · Added \(baby.createdAt.formatted(date: .abbreviated, time: .omitted))"
+    }
+
+    private func deleteBabyConfirmation(_ baby: Baby) -> some View {
+        VStack(spacing: 16) {
+            Spacer().frame(height: 8)
+
+            babyAvatar(baby, size: 80)
+
+            VStack(spacing: 4) {
+                Text(baby.name.isEmpty ? "Unnamed" : baby.name)
+                    .font(.title3.weight(.semibold))
+                Text(babySubtitle(baby))
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            }
+
+            Text("This will permanently delete this baby and all their tracked events.")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal)
+
+            Spacer()
+
+            VStack(spacing: 12) {
+                Button(role: .destructive) {
+                    activityManager.deleteBaby(baby)
+                    babyToDelete = nil
+                } label: {
+                    Text("Delete Baby")
+                        .font(BTTypography.label)
+                        .tracking(BTTracking.label)
+                        .foregroundStyle(.white)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 16)
+                        .background(.red)
+                        .clipShape(Capsule())
+                }
+
+                Button {
+                    babyToDelete = nil
+                } label: {
+                    Text("Cancel")
+                        .font(BTTypography.label)
+                        .tracking(BTTracking.label)
+                        .foregroundStyle(Color.btTextSecondary)
+                }
+            }
+        }
+        .padding(24)
+        .presentationDetents([.medium])
     }
 
     // MARK: - Add Baby Button
@@ -535,6 +639,7 @@ struct WelcomeView: View {
     ) ?? Date()
     @State private var selectedPhoto: PhotosPickerItem?
     @State private var photoData: Data?
+    @State private var showJoinShare = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -648,10 +753,22 @@ struct WelcomeView: View {
                     .cardShadow()
             }
             .disabled(name.trimmingCharacters(in: .whitespaces).isEmpty)
+
+            Button {
+                showJoinShare = true
+            } label: {
+                Text("Join shared baby")
+                    .font(BTTypography.label)
+                    .tracking(BTTracking.label)
+                    .foregroundStyle(Color.btFeedAccent)
+            }
             .padding(.bottom, 40)
         }
         .padding(.horizontal, BTSpacing.pageMargin)
         .background(Color.btBackground)
+        .sheet(isPresented: $showJoinShare) {
+            JoinShareView()
+        }
     }
 }
 

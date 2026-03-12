@@ -24,6 +24,7 @@ nonisolated struct Baby: Identifiable, Hashable, Sendable {
     var dreamFeedHour: Int = 22
     var dreamFeedMinute: Int = 30
     var customFeedIntervalMinutes: Int = 0
+    var customFeedsPerDay: Int = 0
     var photoData: Data?
     var createdAt: Date
 }
@@ -150,6 +151,14 @@ extension Baby {
         return (table.feedIntervalMinutes.lowerBound + table.feedIntervalMinutes.upperBound) / 2
     }
 
+    var effectiveFeedsPerDay: Int {
+        if customFeedsPerDay > 0 {
+            return customFeedsPerDay
+        }
+        let table = AgeTable.forAge(days: ageInDays)
+        return (table.expectedFeedsPerDay.lowerBound + table.expectedFeedsPerDay.upperBound) / 2
+    }
+
     var ageDescription: String {
         let days = ageInDays
         let months = days / 30
@@ -183,6 +192,7 @@ extension Baby {
         dreamFeedHour: Int = 22,
         dreamFeedMinute: Int = 30,
         customFeedIntervalMinutes: Int = 0,
+        customFeedsPerDay: Int = 0,
         photoData: Data? = nil
     ) {
         self.init(
@@ -196,6 +206,7 @@ extension Baby {
             dreamFeedHour: dreamFeedHour,
             dreamFeedMinute: dreamFeedMinute,
             customFeedIntervalMinutes: customFeedIntervalMinutes,
+            customFeedsPerDay: customFeedsPerDay,
             photoData: photoData,
             createdAt: Date()
         )

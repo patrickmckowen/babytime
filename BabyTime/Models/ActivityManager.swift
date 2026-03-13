@@ -1031,6 +1031,7 @@ final class ActivityManager {
                         $0.dreamFeedHour = #bind(baby.dreamFeedHour)
                         $0.dreamFeedMinute = #bind(baby.dreamFeedMinute)
                         $0.customFeedIntervalMinutes = #bind(baby.customFeedIntervalMinutes)
+                        $0.customFeedsPerDay = #bind(baby.customFeedsPerDay)
                         $0.photoData = #bind(baby.photoData)
                     }
                     .execute(db)

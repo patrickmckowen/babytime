@@ -125,7 +125,7 @@ struct SettingsView: View {
 
             LabeledField(label: "Feeds Per Day") {
                 Picker("", selection: feedsPerDayBinding(baby)) {
-                    Text("Age default (\(ageDefaultFeedsPerDay(baby)))").tag(0)
+                    Text("\(ageDefaultFeedsPerDay(baby)) (default)").tag(0)
                     ForEach(4...12, id: \.self) { count in
                         Text("\(count)").tag(count)
                     }

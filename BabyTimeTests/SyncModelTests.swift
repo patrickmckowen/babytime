@@ -545,3 +545,71 @@ struct SyncEnumStorageTests {
         }
     }
 }
+
+// MARK: - Effective Feeds Per Day
+
+@Suite("SyncModels — Effective Feeds Per Day")
+struct EffectiveFeedsPerDayTests {
+
+    @Test("effectiveFeedsPerDay returns age default when customFeedsPerDay is 0")
+    func ageDefault() {
+        // Newborn (0 days old): AgeTable expectedFeedsPerDay = 8...12, midpoint = 10
+        let baby = Baby(name: "Test", birthdate: Date())
+        #expect(baby.customFeedsPerDay == 0)
+        let table = AgeTable.forAge(days: baby.ageInDays)
+        let expectedMidpoint = (table.expectedFeedsPerDay.lowerBound + table.expectedFeedsPerDay.upperBound) / 2
+        #expect(baby.effectiveFeedsPerDay == expectedMidpoint)
+    }
+
+    @Test("effectiveFeedsPerDay returns custom value when set")
+    func customOverride() {
+        var baby = Baby(name: "Test", birthdate: Date())
+        baby.customFeedsPerDay = 6
+        #expect(baby.effectiveFeedsPerDay == 6)
+    }
+
+    @Test("customFeedsPerDay round-trips through database")
+    func databaseRoundTrip() throws {
+        try withDatabase { db in
+            let babyID = UUID()
+            try db.write { db in
+                try Baby.insert {
+                    Baby(
+                        id: babyID,
+                        stableID: UUID().uuidString,
+                        name: "Test",
+                        birthdate: Date(),
+                        customFeedsPerDay: 8,
+                        createdAt: Date()
+                    )
+                }.execute(db)
+            }
+            let fetched = try db.read { db in
+                try Baby.find(babyID).fetchOne(db)
+            }
+            #expect(fetched?.customFeedsPerDay == 8)
+        }
+    }
+
+    @Test("customFeedsPerDay defaults to 0 in database")
+    func defaultsToZero() throws {
+        try withDatabase { db in
+            let babyID = UUID()
+            try db.write { db in
+                try Baby.insert {
+                    Baby(
+                        id: babyID,
+                        stableID: UUID().uuidString,
+                        name: "Test",
+                        birthdate: Date(),
+                        createdAt: Date()
+                    )
+                }.execute(db)
+            }
+            let fetched = try db.read { db in
+                try Baby.find(babyID).fetchOne(db)
+            }
+            #expect(fetched?.customFeedsPerDay == 0)
+        }
+    }
+}

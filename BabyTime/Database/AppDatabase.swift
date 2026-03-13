@@ -185,6 +185,13 @@ extension DependencyValues {
             }
         }
 
+        migrator.registerMigration("Add customFeedsPerDay to syncBabies") { db in
+            try #sql("""
+                ALTER TABLE "syncBabies"
+                ADD COLUMN "customFeedsPerDay" INTEGER NOT NULL DEFAULT 0
+            """).execute(db)
+        }
+
         try migrator.migrate(database)
     }
 }

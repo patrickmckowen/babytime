@@ -1031,6 +1031,7 @@ final class ActivityManager {
                         $0.dreamFeedHour = #bind(baby.dreamFeedHour)
                         $0.dreamFeedMinute = #bind(baby.dreamFeedMinute)
                         $0.customFeedIntervalMinutes = #bind(baby.customFeedIntervalMinutes)
+                        $0.customFeedsPerDay = #bind(baby.customFeedsPerDay)
                         $0.photoData = #bind(baby.photoData)
                     }
                     .execute(db)
@@ -1074,9 +1075,7 @@ final class ActivityManager {
 
     var totalDailyFeeds: Int {
         guard let baby else { return 7 }
-        let table = AgeTable.forAge(days: baby.ageInDays)
-        let range = table.expectedFeedsPerDay
-        return (range.lowerBound + range.upperBound) / 2
+        return baby.effectiveFeedsPerDay
     }
 
     var remainingFeeds: Int { max(1, totalDailyFeeds - feedCount) }

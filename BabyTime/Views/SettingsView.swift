@@ -123,6 +123,16 @@ struct SettingsView: View {
                 .labelsHidden()
             }
 
+            LabeledField(label: "Feeds Per Day") {
+                Picker("", selection: feedsPerDayBinding(baby)) {
+                    Text("\(ageDefaultFeedsPerDay(baby)) (default)").tag(0)
+                    ForEach(4...12, id: \.self) { count in
+                        Text("\(count)").tag(count)
+                    }
+                }
+                .labelsHidden()
+            }
+
             LabeledField(label: "Feed Every") {
                 Picker("", selection: feedIntervalBinding(baby)) {
                     Text("Age default").tag(0)
@@ -506,6 +516,18 @@ struct SettingsView: View {
     }
 
     // MARK: - Time Bindings
+
+    private func feedsPerDayBinding(_ baby: Baby) -> Binding<Int> {
+        Binding(
+            get: { baby.customFeedsPerDay },
+            set: { newValue in activityManager.updateBaby { $0.customFeedsPerDay = newValue } }
+        )
+    }
+
+    private func ageDefaultFeedsPerDay(_ baby: Baby) -> Int {
+        let table = AgeTable.forAge(days: baby.ageInDays)
+        return (table.expectedFeedsPerDay.lowerBound + table.expectedFeedsPerDay.upperBound) / 2
+    }
 
     private func feedIntervalBinding(_ baby: Baby) -> Binding<Int> {
         Binding(
